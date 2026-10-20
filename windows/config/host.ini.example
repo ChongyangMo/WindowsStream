@@ -1,0 +1,37 @@
+[connection]
+mode = reverse
+controller_host =
+bind_host = 0.0.0.0
+port = 7400
+token =
+
+[video]
+resolution = native
+capture = auto
+encoder = auto
+max_width = 1920
+max_height = 1080
+fps = 100
+bitrate_mbps = 48
+
+[permissions]
+clipboard = 1
+
+[updates]
+enabled = 1
+port = 7402
+check_seconds = 15
+
+[background]
+autostart = 1
+tray = 1
+start_hidden = 1
+keep_awake = 1
+watchdog = 1
+idle_pulse = 1
+idle_seconds = 120
+
+[proxy]
+enabled = 1
+tunnel_port = 7403
+connections = 64

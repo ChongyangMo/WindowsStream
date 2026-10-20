@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>local.macstream</string>
+    <key>CFBundleName</key>
+    <string>MacStream</string>
+    <key>CFBundleDisplayName</key>
+    <string>MacStream</string>
+    <key>CFBundleExecutable</key>
+    <string>MacStream</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>MacStream 需要录制屏幕，才能把画面串流到 Windows。</string>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>MacStream 需要访问本地网络，才能被 Windows 客户端自动发现。</string>
+</dict>
+</plist>
