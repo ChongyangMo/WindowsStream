@@ -17,7 +17,7 @@ system_proxy=1
 
 [intranet]
 networks=10.18.0.0/16
-domains=
+domains=*.luxvisions-inno.com
 ip_tunnel=0
 tun_address=172.31.255.1/30
 tun_mtu=1280
