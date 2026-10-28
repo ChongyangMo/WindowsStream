@@ -56,6 +56,7 @@
     <ClCompile Include="..\host\runtime\runtime.cpp" />
     <ClCompile Include="..\host\runtime\tray.cpp" />
     <ClCompile Include="..\host\service\agent.cpp" />
+    <ClCompile Include="..\host\service\attention.cpp" />
     <ClCompile Include="..\host\service\desktop.cpp" />
     <ClCompile Include="..\host\service\launcher.cpp" />
     <ClCompile Include="..\host\service\supervisor.cpp" />

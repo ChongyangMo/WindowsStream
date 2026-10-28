@@ -1,16 +1,14 @@
 <Solution>
   <Configurations>
-    <BuildType Name="Debug" />
-    <BuildType Name="Release" />
     <Platform Name="x64" />
   </Configurations>
-  <Project Path="windows/projects/WindowsStream.vcxproj" />
-  <Project Path="windows/projects/WindowsStreamHost.vcxproj" />
+  <Project Path="windows/projects/WindowsStream.vcxproj" Id="23b67567-c016-4792-886e-db165e164520" />
+  <Project Path="windows/projects/WindowsStreamHost.vcxproj" Id="07eac510-21f0-49e9-9ed0-eb41325423da" />
   <Folder Name="/Tools/">
-    <Project Path="windows/projects/WindowsStreamPing.vcxproj" />
-    <Project Path="windows/projects/WindowsStreamVMSetup.vcxproj" />
-    <Project Path="windows/projects/WindowsStreamTunnel.vcxproj">
-      <Build Value="false" />
+    <Project Path="windows/projects/WindowsStreamPing.vcxproj" Id="c176a79d-6937-42d8-bdf2-4ec5efb93942" />
+    <Project Path="windows/projects/WindowsStreamVMSetup.vcxproj" Id="487758d0-f4ef-4188-952d-14a1cd5cbb6f" />
+    <Project Path="windows/projects/WindowsStreamTunnel.vcxproj" Id="587eca23-9666-41b1-979c-9df7b5ecf514">
+      <Build Project="false" />
     </Project>
   </Folder>
 </Solution>

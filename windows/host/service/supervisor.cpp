@@ -26,22 +26,29 @@ void WINAPI Main(DWORD, wchar_t**) {
     if (!statusHandle) return;
     stop = CreateEventW(nullptr, TRUE, FALSE, nullptr);
     if (!stop || !LocalSystem()) { Status(SERVICE_STOPPED, ERROR_ACCESS_DENIED); if (stop) CloseHandle(stop); return; }
+    std::wstring attentionName;
+    const HANDLE attention = CreateAttentionEvent(attentionName);
+    if (!attention) { Status(SERVICE_STOPPED, GetLastError()); CloseHandle(stop); return; }
     const auto job = CreateJobObjectW(nullptr, nullptr);
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
     limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
     if (!job || !SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof limits)) {
-        Status(SERVICE_STOPPED, GetLastError()); if (job) CloseHandle(job); CloseHandle(stop); return;
+        Status(SERVICE_STOPPED, GetLastError()); if (job) CloseHandle(job); CloseHandle(attention); CloseHandle(stop); return;
     }
     Status(SERVICE_RUNNING);
     PROCESS_INFORMATION child{}; DWORD active = 0xffffffff, lastError = 0;
-    while (WaitForSingleObject(stop, 1000) == WAIT_TIMEOUT) {
+    const HANDLE events[]{stop, attention};
+    for (;;) {
+        const DWORD signal = WaitForMultipleObjects(2, events, FALSE, 1000);
+        if (signal == WAIT_OBJECT_0 || signal == WAIT_FAILED) break;
+        if (signal == WAIT_OBJECT_0 + 1) { SendAttention(child.hProcess); continue; }
         const DWORD session = InteractiveSession();
         if (child.hProcess && (session != active || WaitForSingleObject(child.hProcess, 0) != WAIT_TIMEOUT)) {
             TerminateProcess(child.hProcess, 0); WaitForSingleObject(child.hProcess, 5000);
             CloseHandle(child.hProcess); CloseHandle(child.hThread); child = {};
         }
         if (child.hProcess || session == 0xffffffff) continue;
-        if (LaunchAgent(session, child)) {
+        if (LaunchAgent(session, attentionName, child)) {
             if (!AssignProcessToJobObject(job, child.hProcess)) {
                 const DWORD error = GetLastError(); TerminateProcess(child.hProcess, error);
                 CloseHandle(child.hProcess); CloseHandle(child.hThread); child = {};
@@ -63,7 +70,7 @@ void WINAPI Main(DWORD, wchar_t**) {
         CloseHandle(child.hProcess); CloseHandle(child.hThread);
     }
     LogLine("服务器服务已停止，交互会话代理已回收");
-    CloseHandle(stop); stop = nullptr; Status(SERVICE_STOPPED);
+    CloseHandle(attention); CloseHandle(stop); stop = nullptr; Status(SERVICE_STOPPED);
 }
 }
 int RunService() {

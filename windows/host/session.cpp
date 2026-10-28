@@ -47,6 +47,10 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
                 case MsgRequestKeyframe:
                     if (payload.empty()) forceKeyframe = true;
                     break;
+                case MsgSecureAttention:
+                    if (payload.empty() && servermode::SecureAgent() && !servermode::RequestAttention())
+                        LogLine("请求服务器安全注意序列失败：%lu", GetLastError());
+                    break;
                 case MsgClipboard:
                     if (config.clipboard && !clipboard.Apply(payload)) LogLine("写入文本剪贴板失败");
                     break;

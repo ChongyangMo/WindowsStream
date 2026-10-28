@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="ping"><UniqueIdentifier>{3ca71750-a40a-4b4c-9d37-221fa61d6359}</UniqueIdentifier></Filter>
+    <Filter Include="shared"><UniqueIdentifier>{71367cc2-e8a2-4941-a312-cfef56441f9f}</UniqueIdentifier></Filter>
+    <Filter Include="shared\proxy"><UniqueIdentifier>{3155806d-cc1b-4dc7-ba2e-f2883f761021}</UniqueIdentifier></Filter>
+    <Filter Include="src"><UniqueIdentifier>{0a320842-bba0-4a17-807d-46f1286bf0c5}</UniqueIdentifier></Filter>
+    <Filter Include="src\ping"><UniqueIdentifier>{b67b5fc8-0103-47f7-abb9-f6c946c7a319}</UniqueIdentifier></Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\ping\main.cpp"><Filter>ping</Filter></ClCompile>
+    <ClCompile Include="..\shared\crypto.cpp"><Filter>shared</Filter></ClCompile>
+    <ClCompile Include="..\shared\net_health.cpp"><Filter>shared</Filter></ClCompile>
+    <ClCompile Include="..\shared\proxy\authentication.cpp"><Filter>shared\proxy</Filter></ClCompile>
+    <ClCompile Include="..\shared\proxy\transport.cpp"><Filter>shared\proxy</Filter></ClCompile>
+    <ClCompile Include="..\src\common.cpp"><Filter>src</Filter></ClCompile>
+    <ClCompile Include="..\src\ping\client.cpp"><Filter>src\ping</Filter></ClCompile>
+    <ClInclude Include="..\shared\crypto.h"><Filter>shared</Filter></ClInclude>
+    <ClInclude Include="..\shared\net_health.h"><Filter>shared</Filter></ClInclude>
+    <ClInclude Include="..\shared\proxy\transport.h"><Filter>shared\proxy</Filter></ClInclude>
+    <ClInclude Include="..\src\common.h"><Filter>src</Filter></ClInclude>
+    <ClInclude Include="..\src\ping\client.h"><Filter>src\ping</Filter></ClInclude>
+  </ItemGroup>
+</Project>

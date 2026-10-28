@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="src"><UniqueIdentifier>{a09240d5-0d7d-4c8d-a8bc-6bd3190714df}</UniqueIdentifier></Filter>
+    <Filter Include="src\proxy"><UniqueIdentifier>{615b6387-1121-4ce6-9390-d3d450afd0d2}</UniqueIdentifier></Filter>
+    <Filter Include="vm_browser"><UniqueIdentifier>{f76301ba-1dcc-423f-af10-9c7f2fc2f79d}</UniqueIdentifier></Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\src\common.cpp"><Filter>src</Filter></ClCompile>
+    <ClCompile Include="..\src\proxy\system_settings.cpp"><Filter>src\proxy</Filter></ClCompile>
+    <ClCompile Include="..\vm_browser\main.cpp"><Filter>vm_browser</Filter></ClCompile>
+    <ClInclude Include="..\src\common.h"><Filter>src</Filter></ClInclude>
+    <ClInclude Include="..\src\proxy\system_settings.h"><Filter>src\proxy</Filter></ClInclude>
+  </ItemGroup>
+</Project>

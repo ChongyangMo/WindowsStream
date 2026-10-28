@@ -1,7 +1,7 @@
 #pragma once
 #include "../src/common.h"
 
-// 反向模式自动发现：被控端广播寻找控制端，请求与应答都用配对口令签名，见 PROTOCOL.md。
+// 反向模式自动发现：被控端广播寻找控制端，请求与应答都用配对口令签名。
 namespace locate {
 constexpr uint16_t kPort = 7401;
 std::vector<uint8_t> Request(const std::string& token, uint8_t nonce[16]);

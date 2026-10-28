@@ -3,6 +3,7 @@ $installed = $false
 $previouslyRunning = $false
 $backupExe = $null
 $backupIni = $null
+$policyChanged = $false
 try {
     $settings = @{}
     foreach ($line in [IO.File]::ReadAllLines((Join-Path $PSScriptRoot 'server-service.ini'))) {
@@ -70,12 +71,24 @@ public static class WindowsStreamServerIni {
         New-Service -Name $name -DisplayName 'WindowsStream Server' -BinaryPathName $binary -StartupType Automatic -Description '服务器远程桌面会话代理' | Out-Null
     } else { Set-Service -Name $name -StartupType Automatic }
     $installed = $true
+    $policy = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
+    $oldPolicy = Get-ItemProperty -LiteralPath $policy -Name SoftwareSASGeneration -ErrorAction SilentlyContinue
+    $oldValue = if ($oldPolicy) { [int]$oldPolicy.SoftwareSASGeneration } else { 0 }
+    $appliedValue = $oldValue -bor 1
+    $savedPolicy = Join-Path $root 'installation.ini'
+    if (-not (Test-Path -LiteralPath $savedPolicy)) {
+        [IO.File]::WriteAllText($savedPolicy, "[policy]`r`nexisted=$([int][bool]$oldPolicy)`r`noriginal=$oldValue`r`napplied=$appliedValue`r`n", [Text.UTF8Encoding]::new($true))
+    }
+    New-ItemProperty -LiteralPath $policy -Name SoftwareSASGeneration -Value $appliedValue -PropertyType DWord -Force | Out-Null
+    $policyChanged = $true
+    Write-Host '已允许系统服务发送安全注意序列，原策略已保存在受保护的安装目录。'
     Start-Service -Name $name
     (Get-Service -Name $name).WaitForStatus('Running', [TimeSpan]::FromSeconds(15))
     Start-Sleep -Seconds 5
     $status = Get-CimInstance Win32_Service -Filter "Name='WindowsStreamServer'"
     $agents = @(Get-CimInstance Win32_Process -Filter "Name='WindowsStreamHost.exe'" | Where-Object { $_.ExecutablePath -eq $exe -and $_.CommandLine -match '--server-agent' })
-    [IO.File]::WriteAllText((Join-Path $PSScriptRoot 'service-state.json'), (@{state=$status.State;process=$status.ProcessId;agents=@($agents | Select-Object ProcessId,SessionId);hash=(Get-FileHash -LiteralPath $exe).Hash;time=(Get-Date -Format 's')} | ConvertTo-Json -Depth 4), [Text.UTF8Encoding]::new($false))
+    $logonProcesses = @(Get-CimInstance Win32_Process | Where-Object Name -in @('winlogon.exe','LogonUI.exe','dwm.exe') | Select-Object Name,ProcessId,SessionId)
+    [IO.File]::WriteAllText((Join-Path $PSScriptRoot 'service-state.json'), (@{state=$status.State;process=$status.ProcessId;agents=@($agents | Select-Object ProcessId,SessionId);logon_processes=$logonProcesses;hash=(Get-FileHash -LiteralPath $exe).Hash;time=(Get-Date -Format 's')} | ConvertTo-Json -Depth 4), [Text.UTF8Encoding]::new($false))
     if ($status.State -ne 'Running' -or -not $agents.Count) { throw '系统服务或交互会话代理尚未就绪。' }
     Write-Host '服务器系统服务及会话代理已启动，登录画面仍需通过实际远程连接检查。'
 } catch {
@@ -84,5 +97,9 @@ public static class WindowsStreamServerIni {
     if ($backupExe -and (Test-Path -LiteralPath $backupExe)) { Copy-Item -LiteralPath $backupExe -Destination $exe -Force }
     if ($backupIni -and (Test-Path -LiteralPath $backupIni)) { Copy-Item -LiteralPath $backupIni -Destination $ini -Force }
     if ($previouslyRunning) { Start-Service -Name 'WindowsStreamServer' -ErrorAction SilentlyContinue }
+    if ($policyChanged) {
+        if ($oldPolicy) { New-ItemProperty -LiteralPath $policy -Name SoftwareSASGeneration -Value $oldValue -PropertyType DWord -Force | Out-Null }
+        else { Remove-ItemProperty -LiteralPath $policy -Name SoftwareSASGeneration -ErrorAction SilentlyContinue }
+    }
     exit 1
 }

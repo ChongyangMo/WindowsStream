@@ -15,8 +15,8 @@ try {
     $program = Join-Path $PSScriptRoot 'WindowsStream.exe'
     $ini = Join-Path $PSScriptRoot 'client.ini'
     if (-not (Test-Path -LiteralPath $program)) {
-        $program = Join-Path $PSScriptRoot '..\build\controller\WindowsStream.exe'
-        $ini = Join-Path $PSScriptRoot '..\build\controller\client.ini'
+        $program = Join-Path $PSScriptRoot '..\build\Release\controller\WindowsStream.exe'
+        $ini = Join-Path $PSScriptRoot '..\build\Release\controller\client.ini'
     }
     $program = (Resolve-Path -LiteralPath $program).Path
     if (-not (Test-Path -LiteralPath $ini)) { throw '未找到控制端配置，请先构建 WindowsStream。' }

@@ -776,6 +776,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
             SetFocus(hwnd);
             OnLocalClipboardChanged();
             return 0;
+        case kViewerSecureAttention:
+            if (GetPrivateProfileIntW(L"permissions", L"secure_attention", 0, ConfigPath().c_str()))
+                if (const auto connection = CurrentConnection()) connection->Send(MsgSecureAttention);
+            return 0;
         case WM_TIMER:
             if (wParam == kViewSizeTimer) {
                 KillTimer(hwnd, kViewSizeTimer);

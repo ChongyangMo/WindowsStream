@@ -4,7 +4,7 @@
 #include <shellapi.h>
 
 namespace servermode {
-namespace { bool secureAgent = false; }
+namespace { bool secureAgent = false; std::wstring attentionEvent; }
 bool SecureAgent() { return secureAgent; }
 bool LocalSystem() {
     HANDLE token = nullptr;
@@ -15,7 +15,15 @@ bool LocalSystem() {
     CloseHandle(token);
     return result;
 }
-int RunAgent() {
+bool RequestAttention() {
+    if (!secureAgent || attentionEvent.empty()) return false;
+    HANDLE event = OpenEventW(EVENT_MODIFY_STATE, FALSE, attentionEvent.c_str());
+    if (!event) return false;
+    const bool sent = SetEvent(event) != FALSE;
+    CloseHandle(event);
+    return sent;
+}
+int RunAgent(const std::wstring& eventName) {
     DWORD session = 0; ProcessIdToSessionId(GetCurrentProcessId(), &session);
     if (!LocalSystem() || !session) { LogLine("服务器会话代理必须由系统服务在交互会话内启动"); return 1; }
     const auto ini = PortableDir() + L"\\host.ini";
@@ -25,6 +33,7 @@ int RunAgent() {
         LogLine("服务器会话代理配置无效，仅允许带认证的本机监听模式"); return 1;
     }
     secureAgent = true;
+    attentionEvent = eventName;
     config.capture = L"gdi"; config.encoder = L"software"; config.clipboard = false;
     config.fps = std::min(config.fps, 30);
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
@@ -40,10 +49,11 @@ int RunAgent() {
 }
 int Dispatch() {
     int count = 0; auto arguments = CommandLineToArgvW(GetCommandLineW(), &count);
-    const std::wstring command = arguments && count == 2 ? arguments[1] : L"";
+    const std::wstring command = arguments && count >= 2 ? arguments[1] : L"";
+    const std::wstring eventName = arguments && count == 3 ? arguments[2] : L"";
     if (arguments) LocalFree(arguments);
     if (command == L"--server-service") return RunService();
-    if (command == L"--server-agent") return RunAgent();
+    if (command == L"--server-agent") return RunAgent(eventName);
     if (command == L"--stop-user-host") {
         const auto window = FindWindowW(L"WindowsStreamHostWindow", nullptr);
         return window && !PostMessageW(window, kHostExitForUpdate, 0, 0) ? 1 : 0;

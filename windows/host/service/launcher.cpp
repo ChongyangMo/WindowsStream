@@ -27,7 +27,7 @@ DWORD InteractiveSession() {
     if (selected == 0xffffffff) selected = WTSGetActiveConsoleSessionId();
     return selected == 0 ? 0xffffffff : selected;
 }
-bool LaunchAgent(DWORD session, PROCESS_INFORMATION& process) {
+bool LaunchAgent(DWORD session, const std::wstring& attentionEvent, PROCESS_INFORMATION& process) {
     HANDLE source = nullptr, token = nullptr;
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_DUPLICATE | TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES, &source)) return false;
     const bool privileges = Enable(source, SE_TCB_NAME) && Enable(source, SE_ASSIGNPRIMARYTOKEN_NAME) && Enable(source, SE_INCREASE_QUOTA_NAME);
@@ -41,7 +41,7 @@ bool LaunchAgent(DWORD session, PROCESS_INFORMATION& process) {
             const DWORD size = GetModuleFileNameW(nullptr, module, MAX_PATH);
             if (!size || size >= MAX_PATH) ok = false;
             else {
-                std::wstring command = L"\"" + std::wstring(module) + L"\" --server-agent";
+                std::wstring command = L"\"" + std::wstring(module) + L"\" --server-agent \"" + attentionEvent + L"\"";
                 STARTUPINFOW startup{sizeof startup}; startup.lpDesktop = const_cast<wchar_t*>(L"winsta0\\default");
                 ok = CreateProcessAsUserW(token, module, command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW | CREATE_SUSPENDED,
                     nullptr, PortableDir().c_str(), &startup, &process) != FALSE;

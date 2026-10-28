@@ -134,11 +134,15 @@ void Window::Menu(int index) {
     HMENU menu = CreatePopupMenu(); if (!menu) return;
     AppendMenuW(menu, MF_STRING | (tabs_[static_cast<size_t>(index)].view ? 0 : MF_GRAYED), kWorkspaceDetach, L"移到新窗口");
     AppendMenuW(menu, MF_STRING, kWorkspaceClose, L"关闭标签页");
+    if (ReadSetting(tabs_[static_cast<size_t>(index)].profile.path, L"permissions", L"secure_attention", L"0") == L"1")
+        AppendMenuW(menu, MF_STRING, kWorkspaceSecureAttention, L"Ctrl+Alt+Del");
     POINT point{}; GetCursorPos(&point);
     const auto command = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON, point.x, point.y, 0, window_, nullptr);
     DestroyMenu(menu);
     if (command == kWorkspaceDetach) Detach(index);
     else if (command == kWorkspaceClose) CloseTab(index);
+    else if (command == kWorkspaceSecureAttention && tabs_[static_cast<size_t>(index)].view)
+        PostMessageW(tabs_[static_cast<size_t>(index)].view, kViewerSecureAttention, 0, 0);
 }
 LRESULT CALLBACK Window::TabProcedure(HWND control, UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR, DWORD_PTR data) {
     auto self = reinterpret_cast<Window*>(data);

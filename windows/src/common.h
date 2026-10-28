@@ -38,6 +38,7 @@ enum MessageType : uint8_t {
     MsgViewSize = 45,
     MsgMonitorMode = 46,
     MsgRequestKeyframe = 50,
+    MsgSecureAttention = 51,
 };
 
 constexpr uint32_t kProtocolVersion = 2;

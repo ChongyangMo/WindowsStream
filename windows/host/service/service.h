@@ -6,10 +6,13 @@ namespace servermode {
 int Dispatch();
 bool SecureAgent();
 bool LocalSystem();
-int RunAgent();
+int RunAgent(const std::wstring& attentionEvent);
 int RunService();
 DWORD InteractiveSession();
-bool LaunchAgent(DWORD session, PROCESS_INFORMATION& process);
+bool LaunchAgent(DWORD session, const std::wstring& attentionEvent, PROCESS_INFORMATION& process);
+HANDLE CreateAttentionEvent(std::wstring& name);
+void SendAttention(HANDLE agent);
+bool RequestAttention();
 
 class DesktopBinding {
 public:
