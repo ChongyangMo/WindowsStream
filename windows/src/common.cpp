@@ -5,6 +5,9 @@
 #include <cstdarg>
 #include <cstdio>
 
+namespace { std::wstring runtimeDirectory; }
+void SetRuntimeDirectory(const std::wstring& directory) { runtimeDirectory = directory; }
+
 uint64_t NowMicros() {
     static const LARGE_INTEGER frequency = [] {
         LARGE_INTEGER f;
@@ -18,6 +21,7 @@ uint64_t NowMicros() {
 }
 
 std::wstring PortableDir() {
+    if (!runtimeDirectory.empty()) return runtimeDirectory;
     wchar_t module[MAX_PATH];
     DWORD n = GetModuleFileNameW(nullptr, module, MAX_PATH);
     if (n == 0 || n >= MAX_PATH) return {};

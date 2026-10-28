@@ -1,4 +1,5 @@
 #include "capture.h"
+#include "service/service.h"
 
 DesktopCapture::~DesktopCapture() {
     Reset();
@@ -65,14 +66,8 @@ bool DesktopCapture::Read() {
         LogLine("主屏分辨率发生变化，需要重新建立画面连接");
         return false;
     }
-    // 安全桌面和锁屏不继续提供旧画面。
-    HDESK desktop = OpenInputDesktop(0, FALSE, DESKTOP_READOBJECTS);
-    wchar_t name[128]{};
-    DWORD needed = 0;
-    bool accessible = desktop && GetUserObjectInformationW(desktop, UOI_NAME, name, sizeof name, &needed) &&
-                      _wcsicmp(name, L"Default") == 0;
-    if (desktop) CloseDesktop(desktop);
-    if (!accessible) {
+    // 普通用户仍只采集默认桌面；服务器代理在系统权限下绑定当前输入桌面。
+    if (!servermode::DesktopAccessible()) {
         LogLine("当前桌面不可访问，可能处于锁屏或管理员确认界面");
         return false;
     }

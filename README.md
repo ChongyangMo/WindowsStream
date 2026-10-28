@@ -1,5 +1,17 @@
 # WindowsStream
 
+## 多连接
+
+控制端使用浏览器式标签页。点击 `+` 新建连接，在连接列表中选择已保存的电脑，或输入地址、端口和配对口令。每个标签页使用独立的观看进程、解码器、输入状态和日志目录；切换标签不重连，附加连接不启动代理和升级监听，也不恢复或改写系统代理。
+
+支持 `Ctrl+T` 新建、`Ctrl+Tab` / `Ctrl+Shift+Tab` 切换、`Ctrl+W` 关闭标签；标签右键选择“移到新窗口”，或点击标签内的关闭按钮。主连接以及接入的旧版连接在关闭外壳时恢复为原独立窗口，内网代理继续运行。原有托盘功能保留。
+
+`workspace.ini` 使用 `[connection.0]` 至 `[connection.63]` 的 `path` 保存已有 INI 的位置；界面只显示连接名称。新建连接保存在 `connections/<连接标识>/client.ini`，日志和性能记录也在该连接目录。口令只保存在配置中，不放入命令行或日志。
+
+命令行可用 `--profile "完整 INI 路径"` 打开指定连接，`--new-window` 打开新建连接界面，`--detach-profile "完整 INI 路径"` 拆分窗口，`--close-profile "完整 INI 路径"` 关闭标签。`--replace-workspace` 只重开标签页外壳，用于保留现有主连接的并行升级。`--classic` 保留原独立主窗口入口。
+
+仍沿用被控端现有的单控制会话协议；多台电脑使用各自的地址或监听端口。同一台被控电脑的多人并发控制、锁屏画面采集不在本次改动范围内。
+
 ## 从源码配置
 
 仓库不包含真实配对口令。构建前，将 `windows/config/client.ini.example` 和 `windows/config/host.ini.example` 分别复制为同目录的 `client.ini` 和 `host.ini`，在两份配置中填写相同的随机配对口令（至少 32 字符），并在 `host.ini` 的 `controller_host` 中填写控制端实际 IPv4 地址。`client.ini` 的内网域名按需填写。
@@ -109,6 +121,22 @@ A 启动控制端后，本机 `127.0.0.1:1080` 同时接受 HTTP 代理、HTTPS 
 A 的 `client.ini`：`[proxy] enabled=1`、`local_port=1080`、`tunnel_port=7403`。B 的 `host.ini`：`[proxy] enabled=1`、`tunnel_port=7403`、`connections=16`（1 到 64）。B 的代理控制端地址默认沿用 `controller_host`，可通过 `[proxy] controller_host` 单独指定。历史 INI 缺少该节时也采用这些默认值，B 仅更新 EXE 即可。修改 INI 后重启对应程序；两端隧道端口需一致。
 
 每条反向连接服务一个 TCP 请求，使用有界缓冲区处理背压和半关闭；连接结束后 B 自动补充连接。没有可用通道时 A 最多等待8秒并返回明确失败，不回退为本机直连。退出会中断活动转发并回收线程、套接字。A 的防火墙需允许 TCP 7403；本机代理继续绑定回环地址，虚拟机入口单独绑定 VMware 虚拟网卡。该通道沿用当前受信任网线网络的传输边界，本身未额外加密；HTTPS 内容仍保持端到端 TLS。
+
+### 数据库及其他 TCP 客户端
+
+系统 PAC 不会接管 PostgreSQL/JDBC 等原始 TCP 连接。控制端现在支持固定端口转发，复用 B 的现有认证反向通道，不需要升级 B。A 的 `client.ini` 可添加：
+
+```ini
+[tcp-forward:postgres]
+enabled=1
+listen_port=15432
+target_host=10.18.32.67
+target_port=5432
+```
+
+重启 A 后，DataGrip 的主机填写 `127.0.0.1`、端口填写 `15432`，数据库、用户名和密码使用服务器原值。JDBC 地址为 `jdbc:postgresql://127.0.0.1:15432/postgres`。本机已有 PostgreSQL 占用 `5432` 时不受影响。入口只监听回环地址，不修改系统路由；可配置最多十六个不同名称和本机端口的 `[tcp-forward:名称]` 节。端口被占用时记录原因并每两秒重试；配置变化后重启控制端。目标连接失败时关闭客户端连接，不写入 HTTP/SOCKS 错误字节，也不回退直连。
+
+转发不改变数据库看到的来源地址；数据库仍需允许 B 的实际内网地址。本次真实 PostgreSQL 握手返回缺少 `10.18.92.207` 对应的 `pg_hba.conf` 规则，代理连通不等于数据库登录成功。`windows/tools/postgres-access` 提供服务器端修复工具：核对 `access.ini` 的来源地址后，将整个目录复制到 `10.18.32.67`，运行 `run.cmd`（写入权限不足时以管理员身份运行）。工具只允许配置中的单个来源 `/32`、指定数据库和用户，保留密码认证，原样备份旧文件，不重启数据库。若有多个数据库实例或自定义 HBA 文件，在 INI 中明确填写 `hba_file`。Windows 上的新连接立即读取 HBA 修改，见 [PostgreSQL 文档](https://www.postgresql.org/docs/17/auth-pg-hba-conf.html)。B 的内网 IP 变化时需要同步调整规则。
 
 ### 虚拟机访问
 

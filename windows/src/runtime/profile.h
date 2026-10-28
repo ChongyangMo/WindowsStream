@@ -8,4 +8,4 @@ struct ControllerProfile {
     bool clipboard = true;
 };
 
-ControllerProfile LoadControllerProfile(const std::wstring& path);
+ControllerProfile LoadControllerProfile(const std::wstring& path, bool independent = false);

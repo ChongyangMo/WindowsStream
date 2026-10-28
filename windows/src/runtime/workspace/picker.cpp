@@ -71,7 +71,7 @@ LRESULT CALLBACK ConnectionPicker::Procedure(HWND window, UINT message, WPARAM w
     if (self) {
         if (message == WM_COMMAND && LOWORD(wParam) == 10 && HIWORD(wParam) == CBN_SELCHANGE) { self->Select(); return 0; }
         if (message == WM_COMMAND && LOWORD(wParam) == IDOK) { self->Connect(); return 0; }
-        if (message == WM_COMMAND && LOWORD(wParam) == IDCANCEL || message == WM_CLOSE) { self->Close(); return 0; }
+        if ((message == WM_COMMAND && LOWORD(wParam) == IDCANCEL) || message == WM_CLOSE) { self->Close(); return 0; }
         if (message == WM_NCDESTROY) self->window_ = nullptr;
     }
     return DefWindowProcW(window, message, wParam, lParam);

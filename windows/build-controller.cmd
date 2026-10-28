@@ -25,10 +25,10 @@ if not exist build\controller mkdir build\controller
 if not exist build\client_obj mkdir build\client_obj
 rc /nologo /i resources /fo build\client_obj\app.res resources\controller.rc
 if errorlevel 1 exit /b 1
-cl /nologo /std:c++20 /O2 /EHsc /W4 /utf-8 /MT /DUNICODE /D_UNICODE /Fo:build\client_obj\ src\*.cpp src\updates\*.cpp src\diagnostics\*.cpp src\proxy\*.cpp src\tunnel\*.cpp src\ping\*.cpp src\runtime\*.cpp src\locate\*.cpp shared\*.cpp shared\proxy\*.cpp /Fe:build\controller\WindowsStream.next.exe ^
+cl /nologo /std:c++20 /O2 /EHsc /W4 /utf-8 /MT /DUNICODE /D_UNICODE /Fo:build\client_obj\ src\*.cpp src\updates\*.cpp src\diagnostics\*.cpp src\proxy\*.cpp src\tunnel\*.cpp src\ping\*.cpp src\runtime\*.cpp src\runtime\workspace\*.cpp src\locate\*.cpp shared\*.cpp shared\proxy\*.cpp /Fe:build\controller\WindowsStream.next.exe ^
    /link build\client_obj\app.res /SUBSYSTEM:WINDOWS /MANIFESTUAC:"level='asInvoker' uiAccess='false'" ^
    d3d11.lib dxgi.lib mfplat.lib mfuuid.lib wmcodecdspuuid.lib strmiids.lib ^
-   d3dcompiler.lib ws2_32.lib iphlpapi.lib bcrypt.lib user32.lib gdi32.lib ole32.lib oleaut32.lib imm32.lib shell32.lib wininet.lib advapi32.lib
+   d3dcompiler.lib ws2_32.lib iphlpapi.lib bcrypt.lib user32.lib gdi32.lib ole32.lib oleaut32.lib imm32.lib shell32.lib wininet.lib advapi32.lib comctl32.lib
 if errorlevel 1 exit /b 1
 copy /y tools\setup-vm-proxy.cmd build\controller\setup-vm-proxy.cmd >nul
 if errorlevel 1 exit /b 1

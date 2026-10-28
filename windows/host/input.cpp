@@ -3,6 +3,7 @@
 InputInjector::~InputInjector() { ReleaseAll(); }
 
 bool InputInjector::Submit(INPUT input) {
+    if (servermode::SecureAgent() && !desktop_.Attach()) return false;
     if (SendInput(1, &input, sizeof input) == 1) return true;
     const auto now = NowMicros();
     if (now - lastFailure_ > 2000000) {

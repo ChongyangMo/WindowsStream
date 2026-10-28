@@ -46,6 +46,8 @@ uint64_t NowMicros();
 // 便携模式：exe 旁有 client.ini 或 host.ini 时返回该目录，配置和日志保存在该处。
 // 不依赖 %APPDATA%：从某些打包应用里启动的进程，AppData 写入会被系统重定向，与资源管理器启动的进程看到的不一致。
 std::wstring PortableDir();
+// 每个远程标签页使用自己的配置目录和日志目录。
+void SetRuntimeDirectory(const std::wstring& directory);
 void LogLine(const char* format, ...);
 std::wstring Utf8ToWide(const std::string& text);
 std::string WideToUtf8(const std::wstring& text);

@@ -15,17 +15,17 @@ rc /nologo /i resources /fo build\host_obj\app.res resources\host.rc
 if errorlevel 1 goto failed
 
 :build_controller
-cl /nologo /std:c++20 /O2 /EHsc /W4 /utf-8 /MT /DUNICODE /D_UNICODE /Fo:build\client_obj\ src\*.cpp src\updates\*.cpp src\diagnostics\*.cpp src\proxy\*.cpp src\tunnel\*.cpp src\ping\*.cpp src\runtime\*.cpp src\locate\*.cpp shared\*.cpp shared\proxy\*.cpp /Fe:build\controller\WindowsStream.exe ^
+cl /nologo /std:c++20 /O2 /EHsc /W4 /utf-8 /MT /DUNICODE /D_UNICODE /Fo:build\client_obj\ src\*.cpp src\updates\*.cpp src\diagnostics\*.cpp src\proxy\*.cpp src\tunnel\*.cpp src\ping\*.cpp src\runtime\*.cpp src\runtime\workspace\*.cpp src\locate\*.cpp shared\*.cpp shared\proxy\*.cpp /Fe:build\controller\WindowsStream.exe ^
    /link build\client_obj\app.res /SUBSYSTEM:WINDOWS /MANIFESTUAC:"level='asInvoker' uiAccess='false'" ^
    d3d11.lib dxgi.lib mfplat.lib mfuuid.lib wmcodecdspuuid.lib strmiids.lib ^
-   d3dcompiler.lib ws2_32.lib iphlpapi.lib bcrypt.lib user32.lib gdi32.lib ole32.lib oleaut32.lib imm32.lib shell32.lib wininet.lib advapi32.lib
+   d3dcompiler.lib ws2_32.lib iphlpapi.lib bcrypt.lib user32.lib gdi32.lib ole32.lib oleaut32.lib imm32.lib shell32.lib wininet.lib advapi32.lib comctl32.lib
 if errorlevel 1 goto failed
 if /i "%~1"=="--controller-only" goto copy_controller_tools
 
-cl /nologo /std:c++20 /O2 /EHsc /W4 /utf-8 /MT /DUNICODE /D_UNICODE /Fo:build\host_obj\ host\*.cpp host\update\*.cpp host\runtime\*.cpp host\proxy\*.cpp host\locate\*.cpp shared\*.cpp shared\proxy\*.cpp src\common.cpp /Fe:build\host\WindowsStreamHost.exe ^
+cl /nologo /std:c++20 /O2 /EHsc /W4 /utf-8 /MT /DUNICODE /D_UNICODE /Fo:build\host_obj\ host\*.cpp host\update\*.cpp host\runtime\*.cpp host\proxy\*.cpp host\locate\*.cpp host\service\*.cpp shared\*.cpp shared\proxy\*.cpp src\common.cpp /Fe:build\host\WindowsStreamHost.exe ^
    /link build\host_obj\app.res /SUBSYSTEM:WINDOWS /MANIFESTUAC:"level='asInvoker' uiAccess='false'" ^
    d3d11.lib dxgi.lib mfplat.lib mfuuid.lib wmcodecdspuuid.lib strmiids.lib winmm.lib winhttp.lib ^
-   ws2_32.lib iphlpapi.lib bcrypt.lib user32.lib gdi32.lib ole32.lib oleaut32.lib shell32.lib advapi32.lib
+   ws2_32.lib iphlpapi.lib bcrypt.lib user32.lib gdi32.lib ole32.lib oleaut32.lib shell32.lib advapi32.lib wtsapi32.lib
 if errorlevel 1 goto failed
 
 :copy_controller_tools

@@ -4,6 +4,7 @@
 constexpr UINT kWorkspaceAction = WM_APP + 40;
 constexpr UINT kViewerFocus = WM_APP + 41;
 constexpr UINT kWorkspaceNew = 42101, kWorkspaceClose = 42102, kWorkspaceDetach = 42103, kWorkspaceNext = 42104;
+constexpr UINT kWorkspaceFullscreen = 42105;
 
 struct ViewerStartup {
     std::wstring config;

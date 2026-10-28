@@ -3,6 +3,7 @@
 #include "update/apply.h"
 #include "runtime/runtime.h"
 #include "proxy/client.h"
+#include "service/service.h"
 #include "locate/locator.h"
 #include "../shared/host_control.h"
 #include "../shared/app_icon.h"
@@ -42,6 +43,8 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
 }
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
+    const int serverResult = servermode::Dispatch();
+    if (serverResult >= 0) return serverResult;
     int argumentCount = 0;
     auto arguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount);
     if (arguments && argumentCount == 6 && std::wstring(arguments[1]) == L"--watchdog") {

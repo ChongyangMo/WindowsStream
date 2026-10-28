@@ -1,6 +1,7 @@
 #pragma once
 #include "../src/common.h"
 #include <set>
+#include "service/service.h"
 
 class InputInjector {
 public:
@@ -15,4 +16,5 @@ private:
     std::set<uint16_t> keys_;
     std::set<uint8_t> buttons_;
     uint64_t lastFailure_ = 0;
+    servermode::DesktopBinding desktop_;
 };

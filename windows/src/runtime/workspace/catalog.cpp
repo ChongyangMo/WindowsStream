@@ -33,7 +33,9 @@ std::wstring ReadSetting(const std::wstring& path, const wchar_t* section, const
 }
 std::vector<Profile> LoadProfiles(const std::wstring& base) {
     std::vector<Profile> profiles;
-    profiles.push_back({ReadSetting(base, L"connection", L"name", L"主连接"), base, true});
+    const bool primary = GetPrivateProfileIntW(L"proxy", L"enabled", 1, base.c_str()) != 0 ||
+        GetPrivateProfileIntW(L"updates", L"enabled", 1, base.c_str()) != 0;
+    profiles.push_back({ReadSetting(base, L"connection", L"name", L"主连接"), base, primary});
     const auto catalog = std::filesystem::path(base).parent_path() / L"workspace.ini";
     for (unsigned i = 0; i < 64; ++i) {
         const auto section = L"connection." + std::to_wstring(i);

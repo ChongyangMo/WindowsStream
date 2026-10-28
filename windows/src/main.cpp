@@ -11,6 +11,7 @@
 #include "diagnostics/window_fit.h"
 #include "runtime/tray.h"
 #include "runtime/profile.h"
+#include "runtime/workspace.h"
 #include "../shared/app_icon.h"
 
 #include <imm.h>
@@ -59,6 +60,7 @@ std::thread g_networkThread;
 NetworkAccess g_networkAccess;
 ControllerTray g_controllerTray;
 ControllerProfile g_profile;
+ViewerStartup g_startup;
 std::atomic<uint64_t> g_bytesReceived{0};
 std::atomic<int64_t> g_rttMicros{-1};
 std::atomic<int> g_fps{0};
@@ -138,6 +140,7 @@ void PostStatus(const std::wstring& text) {
 // ---------------- 配置 ----------------
 
 std::wstring ConfigPath() {
+    if (!g_startup.config.empty()) return g_startup.config;
     if (std::wstring portable = PortableDir(); !portable.empty()) {
         return portable + L"\\client.ini";
     }
@@ -521,7 +524,7 @@ void ReleaseAllRemote() {
 LRESULT CALLBACK KeyboardHook(int code, WPARAM wParam, LPARAM lParam) {
     if (code == HC_ACTION) {
         auto* info = reinterpret_cast<KBDLLHOOKSTRUCT*>(lParam);
-        if ((info->vkCode == VK_LWIN || info->vkCode == VK_RWIN) && GetForegroundWindow() == g_window && Connected()) {
+        if ((info->vkCode == VK_LWIN || info->vkCode == VK_RWIN) && ViewerHasFocus(g_window) && Connected()) {
             bool down = wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN;
             PostMessageW(g_window, WM_APP_WINKEY, down, info->vkCode == VK_RWIN);
             return 1;
@@ -558,6 +561,7 @@ std::wstring ReplaceAll(std::wstring text, const std::wstring& from, const std::
 }
 
 void OnLocalClipboardChanged() {
+    if (!ViewerHasFocus(g_window)) return;
     if (!g_profile.clipboard) return;
     if (GetClipboardSequenceNumber() == g_ownClipboardSequence || !Connected()) return;
     std::string utf8 = WideToUtf8(ReplaceAll(ReadClipboardText(), L"\r\n", L"\n"));
@@ -569,6 +573,7 @@ void OnLocalClipboardChanged() {
 }
 
 void ApplyRemoteClipboard(const std::wstring& text) {
+    if (!ViewerHasFocus(g_window)) return;
     if (!g_profile.clipboard) return;
     std::string utf8 = WideToUtf8(text);
     if (utf8 == g_lastClipboard) return;
@@ -595,6 +600,10 @@ void ApplyRemoteClipboard(const std::wstring& text) {
 
 void ToggleFullscreen() {
     ReleaseAllRemote();
+    if (GetWindowLongPtrW(g_window, GWL_STYLE) & WS_CHILD) {
+        PostMessageW(GetAncestor(g_window, GA_ROOT), kWorkspaceAction, kWorkspaceFullscreen, 0);
+        return;
+    }
     LONG style = GetWindowLongW(g_window, GWL_STYLE);
     if (!g_fullscreen) {
         MONITORINFO monitor{sizeof monitor};
@@ -688,6 +697,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
         case WM_SYSKEYUP: {
             bool down = message == WM_KEYDOWN || message == WM_SYSKEYDOWN;
             UINT vk = static_cast<UINT>(wParam);
+            if (HandleWorkspaceShortcut(hwnd, message, wParam)) { ReleaseAllRemote(); return 0; }
             bool ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
             bool alt = (GetKeyState(VK_MENU) & 0x8000) != 0;
             if (down && vk == VK_RETURN && ctrl && alt) {
@@ -753,7 +763,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
             GetCursorPos(&p);
             ScreenToClient(hwnd, &p);
             GetClientRect(hwnd, &client);
-            if (PtInRect(&client, p) && GetForegroundWindow() == hwnd) SetCursor(g_remoteCursor);
+            if (PtInRect(&client, p) && ViewerHasFocus(hwnd)) SetCursor(g_remoteCursor);
             return 0;
         }
         case WM_APP_STATUS: {
@@ -762,6 +772,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
             UpdateTitle();
             return 0;
         }
+        case kViewerFocus:
+            SetFocus(hwnd);
+            OnLocalClipboardChanged();
+            return 0;
         case WM_TIMER:
             if (wParam == kViewSizeTimer) {
                 KillTimer(hwnd, kViewSizeTimer);
@@ -818,11 +832,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
 
 }  // namespace
 
-int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int show) {
+int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     const int guardResult = proxy::RunProxyGuard();
     if (guardResult >= 0) return guardResult;
+    const int workspaceResult = RunControllerWorkspace(instance, show, g_startup);
+    if (workspaceResult >= 0) return workspaceResult;
     // 同一连接配置仍保持单实例，独立配置可以打开不同服务器窗口。
-    g_profile = LoadControllerProfile(ConfigPath());
+    g_profile = LoadControllerProfile(ConfigPath(), !g_startup.primary);
     HANDLE singleInstance = CreateMutexW(nullptr, TRUE, g_profile.mutex.c_str());
     if (singleInstance && GetLastError() == ERROR_ALREADY_EXISTS) {
         if (HWND existing = FindWindowW(g_profile.windowClass.c_str(), nullptr)) {
@@ -839,19 +855,14 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int show) 
     WSAStartup(MAKEWORD(2, 2), &wsa);
     LoadSettings();
     UpdateServer updateServer;
-    updateServer.StartConfigured(ConfigPath(), g_settings.bindHost, g_settings.token);
     ProxyServer proxyServer;
-    proxyServer.StartConfigured(ConfigPath(), g_settings.bindHost, g_settings.token);
-    // 命令行：WindowsStream.exe 地址，只对本次运行生效（例如临时改走 Wi-Fi 测试）。
-    if (commandLine && *commandLine) {
-        std::wstring host = commandLine;
-        host.erase(0, host.find_first_not_of(L" \""));
-        host.erase(host.find_last_not_of(L" \"") + 1);
-        if (!host.empty()) g_settings.host = host;
+    if (g_startup.primary) {
+        updateServer.StartConfigured(ConfigPath(), g_settings.bindHost, g_settings.token);
+        proxyServer.StartConfigured(ConfigPath(), g_settings.bindHost, g_settings.token);
     }
     LogLine("WindowsStream 客户端启动，目标 %s:%u", WideToUtf8(g_settings.host).c_str(), g_settings.port);
     LocateResponder locateResponder;
-    if (_wcsicmp(g_settings.host.c_str(), L"listen") == 0) locateResponder.Start(g_settings.bindHost, g_settings.port, g_settings.token);
+    if (g_startup.primary && _wcsicmp(g_settings.host.c_str(), L"listen") == 0) locateResponder.Start(g_settings.bindHost, g_settings.port, g_settings.token);
 
     WNDCLASSEXW wc{sizeof wc};
     wc.lpfnWndProc = WindowProc;
@@ -882,11 +893,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int show) 
         AdjustWindowRectExForDpi(&frame, WS_OVERLAPPEDWINDOW, FALSE, 0, dpi);
     }
     int windowW = frame.right - frame.left, windowH = frame.bottom - frame.top;
-    g_window = CreateWindowExW(0, wc.lpszClassName, g_profile.title.c_str(), WS_OVERLAPPEDWINDOW,
+    const bool hosted = g_startup.workspace && IsWindow(g_startup.workspace);
+    g_window = CreateWindowExW(0, wc.lpszClassName, g_profile.title.c_str(), hosted ? WS_CHILD | WS_CLIPSIBLINGS : WS_OVERLAPPEDWINDOW,
                                monitorInfo.rcWork.left + (workW - windowW) / 2, monitorInfo.rcWork.top + (workH - windowH) / 2,
-                               windowW, windowH, nullptr, nullptr, instance, nullptr);
+                               windowW, windowH, hosted ? g_startup.workspace : nullptr, nullptr, instance, nullptr);
     if (!g_window) return 1;
-    g_networkAccess.Start(g_window, ConfigPath(), proxyServer);
+    if (g_startup.primary) g_networkAccess.Start(g_window, ConfigPath(), proxyServer);
     ImmAssociateContextEx(g_window, nullptr, 0);  // 关闭输入法，按键原样发给 Windows
 
     if (!g_video.Initialize(g_window)) {
@@ -902,12 +914,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int show) 
         }
     };
 
-    g_controllerTray.Start(g_window);
+    if (g_startup.primary) g_controllerTray.Start(g_window);
     AddClipboardFormatListener(g_window);
     g_keyboardHook = SetWindowsHookExW(WH_KEYBOARD_LL, KeyboardHook, instance, 0);
     SetTimer(g_window, kTimer, 500, nullptr);
-    ShowWindow(g_window, show == SW_HIDE ? SW_SHOWNORMAL : show);
-    if (!IsWindowVisible(g_window)) ShowWindow(g_window, SW_SHOW);
+    if (!hosted) ShowWindow(g_window, show == SW_HIDE ? SW_SHOWNORMAL : show);
 
     if (g_settings.token.size() < 32) {
         g_status = L"请配置连接口令";

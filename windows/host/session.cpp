@@ -5,6 +5,7 @@
 #include "input.h"
 #include "discovery.h"
 #include "locate/locator.h"
+#include "service/service.h"
 #include <cstdio>
 #include <thread>
 
@@ -185,7 +186,12 @@ void HostServer::Run(const HostConfig& config, HWND owner, const std::function<v
         DiscoveryResponder discovery;
         discovery.Start(config);
         HostConfig activeConfig = config;
+        servermode::DesktopBinding desktop;
         while (running_) {
+            if (!desktop.Attach()) {
+                LogLine("服务器桌面切换暂未完成，重新启动会话代理：%lu", GetLastError());
+                return;
+            }
             FrameStream stream;
             status(L"正在初始化画面");
             if (!stream.Initialize(activeConfig)) {
