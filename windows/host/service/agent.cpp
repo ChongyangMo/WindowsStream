@@ -34,7 +34,7 @@ int RunAgent(const std::wstring& eventName) {
     }
     secureAgent = true;
     attentionEvent = eventName;
-    config.capture = L"gdi"; config.encoder = L"software"; config.clipboard = false;
+    config.capture = L"auto"; config.encoder = L"software"; config.clipboard = false;
     config.fps = std::min(config.fps, 30);
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     DesktopBinding desktop;
