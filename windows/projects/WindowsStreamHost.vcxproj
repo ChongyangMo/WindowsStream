@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{07EAC510-21F0-49E9-9ED0-EB41325423DA}</ProjectGuid>
+    <RootNamespace>WindowsStreamHost</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <ArtifactDirectory>host</ArtifactDirectory>
+    <ApplicationSubsystem>Windows</ApplicationSubsystem>
+  </PropertyGroup>
+  <Import Project="WindowsStream.props" />
+  <ItemDefinitionGroup>
+    <Link><AdditionalDependencies>d3d11.lib;dxgi.lib;mfplat.lib;mfuuid.lib;wmcodecdspuuid.lib;strmiids.lib;winmm.lib;winhttp.lib;wtsapi32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\host\capture_diag.cpp" />
+    <ClCompile Include="..\host\capture_gpu.cpp" />
+    <ClCompile Include="..\host\capture.cpp" />
+    <ClCompile Include="..\host\channel.cpp" />
+    <ClCompile Include="..\host\clipboard.cpp" />
+    <ClCompile Include="..\host\config.cpp" />
+    <ClCompile Include="..\host\cursor.cpp" />
+    <ClCompile Include="..\host\discovery.cpp" />
+    <ClCompile Include="..\host\encoder_gpu_software.cpp" />
+    <ClCompile Include="..\host\encoder_hw_output.cpp" />
+    <ClCompile Include="..\host\encoder_hw_select.cpp" />
+    <ClCompile Include="..\host\encoder_hw.cpp" />
+    <ClCompile Include="..\host\encoder.cpp" />
+    <ClCompile Include="..\host\gpu_convert.cpp" />
+    <ClCompile Include="..\host\input.cpp" />
+    <ClCompile Include="..\host\locate\locator.cpp" />
+    <ClCompile Include="..\host\main.cpp" />
+    <ClCompile Include="..\host\proxy\packet_relay.cpp" />
+    <ClCompile Include="..\host\proxy\proxy_client.cpp" />
+    <ClCompile Include="..\host\runtime\autorun.cpp" />
+    <ClCompile Include="..\host\runtime\awake.cpp" />
+    <ClCompile Include="..\host\runtime\idle_pulse.cpp" />
+    <ClCompile Include="..\host\runtime\keepalive.cpp" />
+    <ClCompile Include="..\host\runtime\lock_policy.cpp" />
+    <ClCompile Include="..\host\runtime\power_watch.cpp" />
+    <ClCompile Include="..\host\runtime\recovery.cpp" />
+    <ClCompile Include="..\host\runtime\runtime.cpp" />
+    <ClCompile Include="..\host\runtime\tray.cpp" />
+    <ClCompile Include="..\host\service\agent.cpp" />
+    <ClCompile Include="..\host\service\desktop.cpp" />
+    <ClCompile Include="..\host\service\launcher.cpp" />
+    <ClCompile Include="..\host\service\supervisor.cpp" />
+    <ClCompile Include="..\host\session.cpp" />
+    <ClCompile Include="..\host\stream.cpp" />
+    <ClCompile Include="..\host\update\apply.cpp" />
+    <ClCompile Include="..\host\update\client.cpp" />
+    <ClCompile Include="..\host\update\stage.cpp" />
+    <ClCompile Include="..\shared\crypto.cpp" />
+    <ClCompile Include="..\shared\locate.cpp" />
+    <ClCompile Include="..\shared\net_health.cpp" />
+    <ClCompile Include="..\shared\proxy\authentication.cpp" />
+    <ClCompile Include="..\shared\proxy\transport.cpp" />
+    <ClCompile Include="..\shared\telemetry.cpp" />
+    <ClCompile Include="..\shared\update_package.cpp" />
+    <ClCompile Include="..\src\common.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\host\capture_diag.h" />
+    <ClInclude Include="..\host\capture_gpu.h" />
+    <ClInclude Include="..\host\capture.h" />
+    <ClInclude Include="..\host\channel.h" />
+    <ClInclude Include="..\host\clipboard.h" />
+    <ClInclude Include="..\host\config.h" />
+    <ClInclude Include="..\host\cursor.h" />
+    <ClInclude Include="..\host\discovery.h" />
+    <ClInclude Include="..\host\encoder_gpu_software.h" />
+    <ClInclude Include="..\host\encoder_hw.h" />
+    <ClInclude Include="..\host\encoder.h" />
+    <ClInclude Include="..\host\gpu_convert.h" />
+    <ClInclude Include="..\host\input.h" />
+    <ClInclude Include="..\host\locate\locator.h" />
+    <ClInclude Include="..\host\proxy\client.h" />
+    <ClInclude Include="..\host\proxy\packet_relay.h" />
+    <ClInclude Include="..\host\runtime\autorun.h" />
+    <ClInclude Include="..\host\runtime\awake.h" />
+    <ClInclude Include="..\host\runtime\idle_pulse.h" />
+    <ClInclude Include="..\host\runtime\keepalive.h" />
+    <ClInclude Include="..\host\runtime\lock_policy.h" />
+    <ClInclude Include="..\host\runtime\power_watch.h" />
+    <ClInclude Include="..\host\runtime\runtime.h" />
+    <ClInclude Include="..\host\runtime\session_lease.h" />
+    <ClInclude Include="..\host\runtime\tray.h" />
+    <ClInclude Include="..\host\service\service.h" />
+    <ClInclude Include="..\host\session.h" />
+    <ClInclude Include="..\host\stream.h" />
+    <ClInclude Include="..\host\update\apply.h" />
+    <ClInclude Include="..\host\update\client.h" />
+    <ClInclude Include="..\shared\app_icon.h" />
+    <ClInclude Include="..\shared\crypto.h" />
+    <ClInclude Include="..\shared\host_control.h" />
+    <ClInclude Include="..\shared\locate.h" />
+    <ClInclude Include="..\shared\net_health.h" />
+    <ClInclude Include="..\shared\proxy\transport.h" />
+    <ClInclude Include="..\shared\telemetry.h" />
+    <ClInclude Include="..\shared\update_package.h" />
+    <ClInclude Include="..\src\common.h" />
+  </ItemGroup>
+  <ItemGroup><ResourceCompile Include="..\resources\host.rc" /></ItemGroup>
+  <ItemGroup>
+    <PortableConfig Include="..\config\host.ini" Condition="Exists('..\config\host.ini')"><TargetName>host.ini</TargetName></PortableConfig>
+    <PortableConfig Include="..\config\host.ini.example" Condition="!Exists('..\config\host.ini')"><TargetName>host.ini</TargetName></PortableConfig>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="WindowsStream.targets" />
+</Project>

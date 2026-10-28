@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{23B67567-C016-4792-886E-DB165E164520}</ProjectGuid>
+    <RootNamespace>WindowsStream</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <ArtifactDirectory>controller</ArtifactDirectory>
+    <ApplicationSubsystem>Windows</ApplicationSubsystem>
+  </PropertyGroup>
+  <Import Project="WindowsStream.props" />
+  <ItemDefinitionGroup>
+    <Link><AdditionalDependencies>d3d11.lib;dxgi.lib;mfplat.lib;mfuuid.lib;wmcodecdspuuid.lib;strmiids.lib;d3dcompiler.lib;imm32.lib;wininet.lib;comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\shared\crypto.cpp" />
+    <ClCompile Include="..\shared\locate.cpp" />
+    <ClCompile Include="..\shared\net_health.cpp" />
+    <ClCompile Include="..\shared\proxy\authentication.cpp" />
+    <ClCompile Include="..\shared\proxy\transport.cpp" />
+    <ClCompile Include="..\shared\telemetry.cpp" />
+    <ClCompile Include="..\shared\update_package.cpp" />
+    <ClCompile Include="..\src\common.cpp" />
+    <ClCompile Include="..\src\diagnostics\metrics.cpp" />
+    <ClCompile Include="..\src\diagnostics\window_fit.cpp" />
+    <ClCompile Include="..\src\discovery.cpp" />
+    <ClCompile Include="..\src\locate\responder.cpp" />
+    <ClCompile Include="..\src\main.cpp" />
+    <ClCompile Include="..\src\net.cpp" />
+    <ClCompile Include="..\src\ping\client.cpp" />
+    <ClCompile Include="..\src\ping\window.cpp" />
+    <ClCompile Include="..\src\proxy\network_access.cpp" />
+    <ClCompile Include="..\src\proxy\pac_server.cpp" />
+    <ClCompile Include="..\src\proxy\proxy_request.cpp" />
+    <ClCompile Include="..\src\proxy\proxy_server.cpp" />
+    <ClCompile Include="..\src\proxy\split_rules.cpp" />
+    <ClCompile Include="..\src\proxy\system_proxy.cpp" />
+    <ClCompile Include="..\src\proxy\system_settings.cpp" />
+    <ClCompile Include="..\src\proxy\tcp_forwards.cpp" />
+    <ClCompile Include="..\src\proxy\vm_access.cpp" />
+    <ClCompile Include="..\src\proxy\vm_networks.cpp" />
+    <ClCompile Include="..\src\proxy\vm_pac.cpp" />
+    <ClCompile Include="..\src\runtime\profile.cpp" />
+    <ClCompile Include="..\src\runtime\tray.cpp" />
+    <ClCompile Include="..\src\runtime\workspace.cpp" />
+    <ClCompile Include="..\src\runtime\workspace\catalog.cpp" />
+    <ClCompile Include="..\src\runtime\workspace\frame.cpp" />
+    <ClCompile Include="..\src\runtime\workspace\picker.cpp" />
+    <ClCompile Include="..\src\runtime\workspace\tabs.cpp" />
+    <ClCompile Include="..\src\tunnel\manager.cpp" />
+    <ClCompile Include="..\src\updates\server.cpp" />
+    <ClCompile Include="..\src\video.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\shared\app_icon.h" />
+    <ClInclude Include="..\shared\crypto.h" />
+    <ClInclude Include="..\shared\host_control.h" />
+    <ClInclude Include="..\shared\locate.h" />
+    <ClInclude Include="..\shared\net_health.h" />
+    <ClInclude Include="..\shared\proxy\transport.h" />
+    <ClInclude Include="..\shared\telemetry.h" />
+    <ClInclude Include="..\shared\update_package.h" />
+    <ClInclude Include="..\src\common.h" />
+    <ClInclude Include="..\src\diagnostics\metrics.h" />
+    <ClInclude Include="..\src\diagnostics\window_fit.h" />
+    <ClInclude Include="..\src\discovery.h" />
+    <ClInclude Include="..\src\keymap.h" />
+    <ClInclude Include="..\src\locate\responder.h" />
+    <ClInclude Include="..\src\net.h" />
+    <ClInclude Include="..\src\ping\client.h" />
+    <ClInclude Include="..\src\ping\window.h" />
+    <ClInclude Include="..\src\proxy\access.h" />
+    <ClInclude Include="..\src\proxy\pac_server.h" />
+    <ClInclude Include="..\src\proxy\request.h" />
+    <ClInclude Include="..\src\proxy\server.h" />
+    <ClInclude Include="..\src\proxy\split_rules.h" />
+    <ClInclude Include="..\src\proxy\system_proxy.h" />
+    <ClInclude Include="..\src\proxy\system_settings.h" />
+    <ClInclude Include="..\src\proxy\tcp_forwards.h" />
+    <ClInclude Include="..\src\proxy\vm_networks.h" />
+    <ClInclude Include="..\src\runtime\profile.h" />
+    <ClInclude Include="..\src\runtime\tray.h" />
+    <ClInclude Include="..\src\runtime\workspace.h" />
+    <ClInclude Include="..\src\runtime\workspace\catalog.h" />
+    <ClInclude Include="..\src\runtime\workspace\picker.h" />
+    <ClInclude Include="..\src\runtime\workspace\window.h" />
+    <ClInclude Include="..\src\tunnel\manager.h" />
+    <ClInclude Include="..\src\updates\server.h" />
+    <ClInclude Include="..\src\video.h" />
+  </ItemGroup>
+  <ItemGroup><ResourceCompile Include="..\resources\controller.rc" /></ItemGroup>
+  <ItemGroup>
+    <PortableConfig Include="..\config\client.ini" Condition="Exists('..\config\client.ini')"><TargetName>client.ini</TargetName></PortableConfig>
+    <PortableConfig Include="..\config\client.ini.example" Condition="!Exists('..\config\client.ini')"><TargetName>client.ini</TargetName></PortableConfig>
+  </ItemGroup>
+  <ItemGroup>
+    <PortableTool Include="..\tools\setup-link.cmd" />
+    <PortableTool Include="..\tools\setup-link.ps1" />
+    <PortableTool Include="..\tools\setup-vm-proxy.cmd" />
+    <PortableTool Include="..\tools\setup-vm-proxy.ps1" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="WindowsStream.targets" />
+</Project>

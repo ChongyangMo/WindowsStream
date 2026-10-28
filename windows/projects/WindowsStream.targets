@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Target Name="CopyPortableFiles" AfterTargets="Build">
+    <MakeDir Directories="$(OutDir)" />
+    <Copy SourceFiles="@(PortableTool)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(PortableConfig)" DestinationFiles="@(PortableConfig->'$(OutDir)%(TargetName)')"
+          Condition="!Exists('$(OutDir)%(PortableConfig.TargetName)')" />
+  </Target>
+</Project>

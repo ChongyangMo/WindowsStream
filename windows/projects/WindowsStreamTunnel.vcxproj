@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{587ECA23-9666-41B1-979C-9DF7B5ECF514}</ProjectGuid>
+    <Keyword>MakeFileProj</Keyword>
+    <RootNamespace>WindowsStreamTunnel</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Makefile</ConfigurationType>
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <ArtifactDirectory>controller</ArtifactDirectory>
+  </PropertyGroup>
+  <Import Project="WindowsStream.props" />
+  <PropertyGroup>
+    <NMakeBuildCommandLine>powershell -NoProfile -ExecutionPolicy Bypass -File "$(WindowsRoot)tunnel\build.ps1" -Configuration "$(Configuration)"</NMakeBuildCommandLine>
+    <NMakeReBuildCommandLine>powershell -NoProfile -ExecutionPolicy Bypass -File "$(WindowsRoot)tunnel\build.ps1" -Configuration "$(Configuration)" -Action Rebuild</NMakeReBuildCommandLine>
+    <NMakeCleanCommandLine>powershell -NoProfile -ExecutionPolicy Bypass -File "$(WindowsRoot)tunnel\build.ps1" -Configuration "$(Configuration)" -Action Clean</NMakeCleanCommandLine>
+    <NMakeOutput>$(OutDir)WindowsStreamTunnel.exe</NMakeOutput>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\tunnel\*.go" />
+    <None Include="..\tunnel\go.mod" />
+    <None Include="..\tunnel\go.sum" />
+    <None Include="..\tunnel\build.ps1" />
+    <None Include="..\config\build.ini" />
+    <None Include="..\third_party\wintun\LICENSE.txt" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

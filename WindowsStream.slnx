@@ -1,0 +1,16 @@
+<Solution>
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Release" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="windows/projects/WindowsStream.vcxproj" />
+  <Project Path="windows/projects/WindowsStreamHost.vcxproj" />
+  <Folder Name="/Tools/">
+    <Project Path="windows/projects/WindowsStreamPing.vcxproj" />
+    <Project Path="windows/projects/WindowsStreamVMSetup.vcxproj" />
+    <Project Path="windows/projects/WindowsStreamTunnel.vcxproj">
+      <Build Value="false" />
+    </Project>
+  </Folder>
+</Solution>

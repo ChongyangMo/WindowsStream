@@ -16,7 +16,7 @@
 
 using Microsoft::WRL::ComPtr;
 
-// 协议消息类型，见 PROTOCOL.md。
+// 控制端与被控端共用的协议消息类型。
 enum MessageType : uint8_t {
     MsgServerHello = 1,
     MsgClientAuth = 2,
