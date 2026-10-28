@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $installed = $false
 $previouslyRunning = $false
 $backupExe = $null
@@ -47,6 +47,9 @@ try {
     Start-Process -FilePath $source -ArgumentList '--stop-user-host' -WorkingDirectory $PSScriptRoot -WindowStyle Hidden -Wait | Out-Null
     Start-Sleep -Seconds 2
     $legacy = Join-Path $PSScriptRoot 'WindowsStreamHost.exe'
+    $guardRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '.windowsstream-runtime')) + '\'
+    $guards = @(Get-CimInstance Win32_Process -Filter "Name='WindowsStreamKeepAlive.exe'" | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($guardRoot, [StringComparison]::OrdinalIgnoreCase) })
+    foreach ($process in $guards) { Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue }
     $old = @(Get-CimInstance Win32_Process -Filter "Name='WindowsStreamHost.exe'" | Where-Object ExecutablePath -eq $legacy)
     foreach ($process in @($old | Where-Object CommandLine -match '--watchdog') + @($old | Where-Object CommandLine -notmatch '--watchdog')) {
         Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue

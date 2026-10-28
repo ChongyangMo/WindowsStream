@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 try {
     $values = @{}
     foreach ($line in [IO.File]::ReadAllLines((Join-Path $PSScriptRoot 'access.ini'))) {
