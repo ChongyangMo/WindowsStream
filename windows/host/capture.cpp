@@ -76,7 +76,6 @@ bool DesktopCapture::Read() {
         return false;
     }
     GdiFlush();
-    if (servermode::RenderLogon(memory_, width_, height_)) GdiFlush();
     return true;
 }
 

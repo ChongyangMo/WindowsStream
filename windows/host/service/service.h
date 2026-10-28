@@ -16,11 +16,8 @@ bool RequestAttention();
 
 class DesktopBinding {
 public:
-    ~DesktopBinding();
+    ~DesktopBinding() = default;
     bool Attach();
-private:
-    HDESK original_ = nullptr, attached_ = nullptr;
 };
 bool DesktopAccessible();
-bool RenderLogon(HDC destination, int width, int height);
 }

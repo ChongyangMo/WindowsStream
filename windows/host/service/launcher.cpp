@@ -62,7 +62,14 @@ bool LaunchAgent(DWORD session, const std::wstring& attentionEvent, PROCESS_INFO
             if (!size || size >= MAX_PATH) ok = false;
             else {
                 std::wstring command = L"\"" + std::wstring(module) + L"\" --server-agent \"" + attentionEvent + L"\"";
-                STARTUPINFOW startup{sizeof startup}; startup.lpDesktop = const_cast<wchar_t*>(L"winsta0\\default");
+                wchar_t desktop[32]{};
+                const auto section = L"session." + std::to_wstring(session);
+                const auto runtime = PortableDir() + L"\\service-runtime.ini";
+                GetPrivateProfileStringW(section.c_str(), L"desktop", L"Winlogon", desktop, 32, runtime.c_str());
+                if (std::wstring(desktop) != L"Default" && std::wstring(desktop) != L"Winlogon") wcscpy_s(desktop, L"Winlogon");
+                std::wstring station = L"winsta0\\" + std::wstring(desktop);
+                STARTUPINFOW startup{sizeof startup}; startup.lpDesktop = station.data();
+                LogLine("服务器会话代理启动桌面：%s，会话 %lu", WideToUtf8(station).c_str(), session);
                 ok = CreateProcessAsUserW(token, module, command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW | CREATE_SUSPENDED,
                     nullptr, PortableDir().c_str(), &startup, &process) != FALSE;
             }

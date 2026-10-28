@@ -45,7 +45,6 @@
     <ClCompile Include="..\host\service\attention.cpp"><Filter>host\service</Filter></ClCompile>
     <ClCompile Include="..\host\service\desktop.cpp"><Filter>host\service</Filter></ClCompile>
     <ClCompile Include="..\host\service\launcher.cpp"><Filter>host\service</Filter></ClCompile>
-    <ClCompile Include="..\host\service\render.cpp"><Filter>host\service</Filter></ClCompile>
     <ClCompile Include="..\host\service\supervisor.cpp"><Filter>host\service</Filter></ClCompile>
     <ClCompile Include="..\host\session.cpp"><Filter>host</Filter></ClCompile>
     <ClCompile Include="..\host\stream.cpp"><Filter>host</Filter></ClCompile>

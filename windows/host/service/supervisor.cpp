@@ -29,12 +29,9 @@ void WINAPI Main(DWORD, wchar_t**) {
     std::wstring attentionName;
     const HANDLE attention = CreateAttentionEvent(attentionName);
     if (!attention) { Status(SERVICE_STOPPED, GetLastError()); CloseHandle(stop); return; }
-    const auto job = CreateJobObjectW(nullptr, nullptr);
+    HANDLE job = nullptr;
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
     limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-    if (!job || !SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof limits)) {
-        Status(SERVICE_STOPPED, GetLastError()); if (job) CloseHandle(job); CloseHandle(attention); CloseHandle(stop); return;
-    }
     Status(SERVICE_RUNNING);
     PROCESS_INFORMATION child{}; DWORD active = 0xffffffff, lastError = 0;
     const HANDLE events[]{stop, attention};
@@ -46,12 +43,17 @@ void WINAPI Main(DWORD, wchar_t**) {
         if (child.hProcess && (session != active || WaitForSingleObject(child.hProcess, 0) != WAIT_TIMEOUT)) {
             TerminateProcess(child.hProcess, 0); WaitForSingleObject(child.hProcess, 5000);
             CloseHandle(child.hProcess); CloseHandle(child.hThread); child = {};
+            if (job) { CloseHandle(job); job = nullptr; }
         }
         if (child.hProcess || session == 0xffffffff) continue;
         if (LaunchAgent(session, attentionName, child)) {
-            if (!AssignProcessToJobObject(job, child.hProcess)) {
+            // 作业对象不能跨交互会话复用；每个会话代理使用独立回收组。
+            job = CreateJobObjectW(nullptr, nullptr);
+            if (!job || !SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof limits) ||
+                !AssignProcessToJobObject(job, child.hProcess)) {
                 const DWORD error = GetLastError(); TerminateProcess(child.hProcess, error);
                 CloseHandle(child.hProcess); CloseHandle(child.hThread); child = {};
+                if (job) { CloseHandle(job); job = nullptr; }
                 LogLine("服务器会话代理无法加入退出回收组：%lu", error); continue;
             }
             ResumeThread(child.hThread);
@@ -64,7 +66,7 @@ void WINAPI Main(DWORD, wchar_t**) {
             WaitForSingleObject(stop, 2000);
         }
     }
-    CloseHandle(job);
+    if (job) CloseHandle(job);
     if (child.hProcess) {
         WaitForSingleObject(child.hProcess, 5000);
         CloseHandle(child.hProcess); CloseHandle(child.hThread);

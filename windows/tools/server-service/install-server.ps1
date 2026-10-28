@@ -33,6 +33,29 @@ try {
     if ($service -and ($service.PathName -ne $binary -or $service.StartName -notin @('LocalSystem','NT AUTHORITY\SYSTEM'))) {
         throw '同名服务不是此服务器组件，未修改现有服务。'
     }
+    $fingerprint = @{
+        binary = (Get-FileHash -LiteralPath $source).Hash
+        configuration = (Get-FileHash -LiteralPath $sourceIni).Hash
+        installer = (Get-FileHash -LiteralPath $PSCommandPath).Hash
+        settings = (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'server-service.ini')).Hash
+    }
+    $receipt = Join-Path $root 'deployment.ini'
+    if ($service -and $service.State -eq 'Running' -and (Test-Path -LiteralPath $receipt) -and
+        (Test-Path -LiteralPath $exe) -and (Test-Path -LiteralPath $ini)) {
+        $previous = @{}
+        foreach ($line in [IO.File]::ReadAllLines($receipt)) {
+            $pair = $line -split '=', 2
+            if ($pair.Count -eq 2) { $previous[$pair[0].Trim()] = $pair[1].Trim() }
+        }
+        $same = (Get-FileHash -LiteralPath $exe).Hash -eq $fingerprint.binary -and
+            (Get-FileHash -LiteralPath $ini).Hash -eq $previous.protected_configuration
+        foreach ($key in $fingerprint.Keys) { if ($previous[$key] -ne $fingerprint[$key]) { $same = $false } }
+        $existingAgents = @(Get-CimInstance Win32_Process -Filter "Name='WindowsStreamHost.exe'" | Where-Object { $_.ExecutablePath -eq $exe -and $_.CommandLine -match '--server-agent' })
+        if ($same -and $existingAgents.Count) {
+            Write-Host '服务器程序与配置未变化，现有系统服务与会话代理继续运行。'
+            exit 0
+        }
+    }
     New-Item -ItemType Directory -Path $root -Force | Out-Null
     & icacls.exe $root /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
     if ($LASTEXITCODE -ne 0) { throw '无法保护服务器程序与配对配置目录。' }
@@ -74,11 +97,24 @@ public static class WindowsStreamServerIni {
     $policy = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
     $oldPolicy = Get-ItemProperty -LiteralPath $policy -Name SoftwareSASGeneration -ErrorAction SilentlyContinue
     $oldValue = if ($oldPolicy) { [int]$oldPolicy.SoftwareSASGeneration } else { 0 }
-    $appliedValue = $oldValue -bor 1
     $savedPolicy = Join-Path $root 'installation.ini'
+    $policyBase = $oldValue
+    if (Test-Path -LiteralPath $savedPolicy) {
+        $priorPolicy = @{}
+        foreach ($line in [IO.File]::ReadAllLines($savedPolicy)) {
+            $pair = $line -split '=', 2
+            if ($pair.Count -eq 2) { $priorPolicy[$pair[0].Trim()] = $pair[1].Trim() }
+        }
+        if ($priorPolicy.ContainsKey('applied') -and $priorPolicy.ContainsKey('original') -and $oldValue -eq [int]$priorPolicy.applied) {
+            $policyBase = [int]$priorPolicy.original
+        }
+    }
+    $appliedValue = $policyBase -bor 1
     if (-not (Test-Path -LiteralPath $savedPolicy)) {
         [IO.File]::WriteAllText($savedPolicy, "[policy]`r`nexisted=$([int][bool]$oldPolicy)`r`noriginal=$oldValue`r`napplied=$appliedValue`r`n", [Text.UTF8Encoding]::new($true))
     }
+    $policyRecord = [IO.File]::ReadAllText($savedPolicy) -replace '(?m)^applied=[^\r\n]*', ('applied=' + $appliedValue)
+    [IO.File]::WriteAllText($savedPolicy, $policyRecord, [Text.UTF8Encoding]::new($true))
     New-ItemProperty -LiteralPath $policy -Name SoftwareSASGeneration -Value $appliedValue -PropertyType DWord -Force | Out-Null
     $policyChanged = $true
     Write-Host '已允许系统服务发送安全注意序列，原策略已保存在受保护的安装目录。'
@@ -90,6 +126,9 @@ public static class WindowsStreamServerIni {
     $logonProcesses = @(Get-CimInstance Win32_Process | Where-Object Name -in @('winlogon.exe','LogonUI.exe','dwm.exe') | Select-Object Name,ProcessId,SessionId)
     [IO.File]::WriteAllText((Join-Path $PSScriptRoot 'service-state.json'), (@{state=$status.State;process=$status.ProcessId;agents=@($agents | Select-Object ProcessId,SessionId);logon_processes=$logonProcesses;hash=(Get-FileHash -LiteralPath $exe).Hash;time=(Get-Date -Format 's')} | ConvertTo-Json -Depth 4), [Text.UTF8Encoding]::new($false))
     if ($status.State -ne 'Running' -or -not $agents.Count) { throw '系统服务或交互会话代理尚未就绪。' }
+    $fingerprint.protected_configuration = (Get-FileHash -LiteralPath $ini).Hash
+    $record = "[package]`r`n" + (($fingerprint.Keys | Sort-Object | ForEach-Object { $_ + '=' + $fingerprint[$_] }) -join "`r`n") + "`r`n"
+    [IO.File]::WriteAllText($receipt, $record, [Text.UTF8Encoding]::new($true))
     Write-Host '服务器系统服务及会话代理已启动，登录画面仍需通过实际远程连接检查。'
 } catch {
     Write-Host ('服务器服务更新失败：' + $_.Exception.Message)
