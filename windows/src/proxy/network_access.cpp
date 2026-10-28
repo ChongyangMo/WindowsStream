@@ -1,8 +1,9 @@
 #include "access.h"
 
-namespace { constexpr UINT kNetworkAccess = 41001, kIntranetPing = 41002; }
+namespace { constexpr UINT kNetworkAccess = 41001, kIntranetPing = 41002, kVirtualMachines = 41003; }
 void NetworkAccess::Start(HWND window, const std::wstring& ini, ProxyServer& server) {
     window_ = window; ini_ = ini; server_ = &server;
+    server_->SetVirtualMachinesAllowed(GetPrivateProfileIntW(L"proxy", L"allow_virtual_machines", 1, ini.c_str()) != 0);
     enabled_ = GetPrivateProfileIntW(L"proxy", L"system_proxy", 1, ini.c_str()) != 0;
     useTunnel_ = false;
     const auto port = GetPrivateProfileIntW(L"proxy", L"local_port", 1080, ini.c_str());
@@ -12,6 +13,8 @@ void NetworkAccess::Start(HWND window, const std::wstring& ini, ProxyServer& ser
     if (menu_) {
         AppendMenuW(menu_, MF_STRING, kNetworkAccess, L"内网访问");
         AppendMenuW(menu_, MF_STRING, kIntranetPing, L"内网 Ping");
+        AppendMenuW(menu_, MF_STRING | (server_->VirtualMachinesAllowed() ? MF_CHECKED : MF_UNCHECKED),
+            kVirtualMachines, L"允许虚拟机访问");
         SetMenu(window_, menu_);
     }
     Update();
@@ -49,6 +52,17 @@ void NetworkAccess::Tick(bool connected) {
     Update();
 }
 bool NetworkAccess::Handle(UINT message, WPARAM wParam) {
+    if (message == WM_COMMAND && LOWORD(wParam) == kVirtualMachines && server_) {
+        const bool allowed = !server_->VirtualMachinesAllowed();
+        if (!WritePrivateProfileStringW(L"proxy", L"allow_virtual_machines", allowed ? L"1" : L"0", ini_.c_str())) {
+            LogLine("保存虚拟机访问开关失败：%lu", GetLastError()); return true;
+        }
+        server_->SetVirtualMachinesAllowed(allowed);
+        CheckMenuItem(menu_, kVirtualMachines, MF_BYCOMMAND | (allowed ? MF_CHECKED : MF_UNCHECKED));
+        DrawMenuBar(window_);
+        LogLine("允许虚拟机访问已%s", allowed ? "开启" : "关闭");
+        return true;
+    }
     if (message == WM_COMMAND && LOWORD(wParam) == kIntranetPing) { ping_.Show(window_, ini_); return true; }
     if (message == WM_COMMAND && LOWORD(wParam) == kNetworkAccess) {
         const bool desired = !enabled_;

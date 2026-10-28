@@ -11,6 +11,8 @@ config.json
 *.keychain-db
 keychain-password
 signing/
+/windows/tools/host-control/vm_key.pub
+/windows/tools/host-control/host_key.pub
 AGENTS.md
 
 # Generated files and local diagnostics

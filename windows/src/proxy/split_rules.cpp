@@ -57,14 +57,15 @@ std::string Fallback(const SystemSettings& original) {
     return result;
 }
 }
-bool BuildSplitPac(const std::wstring& ini, uint16_t port, const SystemSettings& original, std::string& script) {
+bool BuildSplitPac(const std::wstring& ini, uint16_t port, const SystemSettings& original, std::string& script, const std::string& proxyHost) {
     script.clear();
-    if (!port) return false;
+    uint32_t proxyAddress = 0;
+    if (!port || !Ipv4(proxyHost, proxyAddress)) return false;
     // 无法可靠嵌套任意外部 PAC/WPAD 时保留用户原配置，避免悄悄改变外网出口。
     if (original.flags & (4 | 8)) {
         LogLine("原网络已启用自动代理脚本或自动发现，无法安全合并内网分流，保留原代理设置"); return false;
     }
-    const auto endpoint = "127.0.0.1:" + std::to_string(port);
+    const auto endpoint = proxyHost + ":" + std::to_string(port);
     if ((original.flags & 2) && WideToUtf8(original.server).find(endpoint) != std::string::npos) {
         LogLine("原系统代理指向当前内网转发端口，请先关闭旧版内网访问再启动新版"); return false;
     }

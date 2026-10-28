@@ -12,6 +12,13 @@ Peer Tasks::Track(SOCKET socket) {
     sockets_.push_back(peer);
     return peer;
 }
+bool Tasks::Watch(const Peer& peer) {
+    std::lock_guard lock(mutex_);
+    if (!running || !peer) return false;
+    std::erase_if(sockets_, [](const auto& item) { return item.expired(); });
+    sockets_.push_back(peer);
+    return true;
+}
 bool Tasks::Run(std::function<void()> work) {
     std::lock_guard lock(mutex_);
     if (!running) return false;

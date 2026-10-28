@@ -10,6 +10,7 @@
 #include "diagnostics/metrics.h"
 #include "diagnostics/window_fit.h"
 #include "runtime/tray.h"
+#include "runtime/profile.h"
 #include "../shared/app_icon.h"
 
 #include <imm.h>
@@ -57,6 +58,7 @@ std::atomic<bool> g_running{true};
 std::thread g_networkThread;
 NetworkAccess g_networkAccess;
 ControllerTray g_controllerTray;
+ControllerProfile g_profile;
 std::atomic<uint64_t> g_bytesReceived{0};
 std::atomic<int64_t> g_rttMicros{-1};
 std::atomic<int> g_fps{0};
@@ -556,6 +558,7 @@ std::wstring ReplaceAll(std::wstring text, const std::wstring& from, const std::
 }
 
 void OnLocalClipboardChanged() {
+    if (!g_profile.clipboard) return;
     if (GetClipboardSequenceNumber() == g_ownClipboardSequence || !Connected()) return;
     std::string utf8 = WideToUtf8(ReplaceAll(ReadClipboardText(), L"\r\n", L"\n"));
     if (utf8.empty() || utf8 == g_lastClipboard || utf8.size() > 4 * 1024 * 1024) return;
@@ -566,6 +569,7 @@ void OnLocalClipboardChanged() {
 }
 
 void ApplyRemoteClipboard(const std::wstring& text) {
+    if (!g_profile.clipboard) return;
     std::string utf8 = WideToUtf8(text);
     if (utf8 == g_lastClipboard) return;
     g_lastClipboard = utf8;
@@ -611,7 +615,7 @@ void ToggleFullscreen() {
 }
 
 void UpdateTitle() {
-    std::wstring title = L"WindowsStream";
+    std::wstring title = g_profile.title;
     if (!g_status.empty()) title += L" · " + g_status;
     else if (Connected()) title += L" · " + g_diagnostics.Title();
     SetWindowTextW(g_window, title.c_str());
@@ -817,10 +821,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int show) {
     const int guardResult = proxy::RunProxyGuard();
     if (guardResult >= 0) return guardResult;
-    // 只允许一个实例：Windows 同时只接受一个客户端，两个实例会互相顶下线，还会同时读写配置文件。
-    HANDLE singleInstance = CreateMutexW(nullptr, TRUE, L"Local\\WindowsStreamClient");
+    // 同一连接配置仍保持单实例，独立配置可以打开不同服务器窗口。
+    g_profile = LoadControllerProfile(ConfigPath());
+    HANDLE singleInstance = CreateMutexW(nullptr, TRUE, g_profile.mutex.c_str());
     if (singleInstance && GetLastError() == ERROR_ALREADY_EXISTS) {
-        if (HWND existing = FindWindowW(L"WindowsStreamWindow", nullptr)) {
+        if (HWND existing = FindWindowW(g_profile.windowClass.c_str(), nullptr)) {
             ShowWindowAsync(existing, IsIconic(existing) ? SW_RESTORE : SW_SHOW);
             SetForegroundWindow(existing);
             LogLine("控制端已经运行，已请求显示现有窗口");
@@ -853,7 +858,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int show) 
     wc.hInstance = instance;
     wc.hIcon = LoadAppIcon();
     wc.hIconSm = LoadAppIcon(true);
-    wc.lpszClassName = L"WindowsStreamWindow";
+    wc.lpszClassName = g_profile.windowClass.c_str();
     RegisterClassExW(&wc);
 
     // 初始客户区上限为 1920×1080，超出本机工作区时按比例缩小。
@@ -877,7 +882,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine, int show) 
         AdjustWindowRectExForDpi(&frame, WS_OVERLAPPEDWINDOW, FALSE, 0, dpi);
     }
     int windowW = frame.right - frame.left, windowH = frame.bottom - frame.top;
-    g_window = CreateWindowExW(0, wc.lpszClassName, L"WindowsStream", WS_OVERLAPPEDWINDOW,
+    g_window = CreateWindowExW(0, wc.lpszClassName, g_profile.title.c_str(), WS_OVERLAPPEDWINDOW,
                                monitorInfo.rcWork.left + (workW - windowW) / 2, monitorInfo.rcWork.top + (workH - windowH) / 2,
                                windowW, windowH, nullptr, nullptr, instance, nullptr);
     if (!g_window) return 1;

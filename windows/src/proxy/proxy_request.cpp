@@ -71,6 +71,9 @@ bool Http(SOCKET socket, uint8_t first, Request& request) {
     std::string method, target, version, line;
     if (!(lines >> method >> target >> version) || (version != "HTTP/1.1" && version != "HTTP/1.0")) return false;
     std::getline(lines, line);
+    if (method == "GET" && (target == "/windowsstream.pac" || target.starts_with("/windowsstream.pac?"))) {
+        request.pac = true; return true;
+    }
     request.connect = method == "CONNECT";
     if (request.connect) return Authority(target, 443, request);
     if (!target.starts_with("http://")) return false;
@@ -122,6 +125,8 @@ bool Parse(SOCKET socket, Request& request) {
     Text(socket, "HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"); return false;
 }
 bool Reply(SOCKET socket, const Request& request, uint8_t error) {
+    // 固定 TCP 入口不能向数据库发送 HTTP/SOCKS 错误字节，失败时直接关闭。
+    if (request.raw) return error == 0;
     if (request.native) return Send(socket, &error, 1);
     if (request.socks) {
         const uint8_t bytes[10]{5, error, 0, 1, 0, 0, 0, 0, 0, 0};

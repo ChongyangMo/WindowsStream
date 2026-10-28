@@ -96,7 +96,7 @@ INI 可用 `[updates] enabled=0` 关闭升级；A 可配置 `port` 与 `package`
 
 ## 经 B 访问内网
 
-A 启动控制端后，本机 `127.0.0.1:1080` 同时接受 HTTP 代理、HTTPS CONNECT 和 SOCKS5 CONNECT。B 主动连接 A 的 TCP 7403，使用现有配对口令做双向随机挑战认证；代理连接独立于桌面和升级通道。B 不监听入站端口，不改路由，不需要管理员权限。
+A 启动控制端后，本机 `127.0.0.1:1080` 同时接受 HTTP 代理、HTTPS CONNECT 和 SOCKS5 CONNECT。默认还允许 VMware 虚拟机访问，见下文。B 主动连接 A 的 TCP 7403，使用现有配对口令做双向随机挑战认证；代理连接独立于桌面和升级通道。B 不监听入站端口，不改路由，不需要管理员权限。
 
 内网访问直接集成在 A 控制端顶部菜单中。默认在桌面连接及 B 的代理通道就绪后自动开启，普通浏览器跟随系统分流设置，无需 CMD 或专用浏览器。关闭开关、断开或退出会恢复原设置；独立守护在异常退出后恢复。HTTPS 继续由浏览器校验证书。
 
@@ -108,7 +108,37 @@ A 启动控制端后，本机 `127.0.0.1:1080` 同时接受 HTTP 代理、HTTPS 
 
 A 的 `client.ini`：`[proxy] enabled=1`、`local_port=1080`、`tunnel_port=7403`。B 的 `host.ini`：`[proxy] enabled=1`、`tunnel_port=7403`、`connections=16`（1 到 64）。B 的代理控制端地址默认沿用 `controller_host`，可通过 `[proxy] controller_host` 单独指定。历史 INI 缺少该节时也采用这些默认值，B 仅更新 EXE 即可。修改 INI 后重启对应程序；两端隧道端口需一致。
 
-每条反向连接服务一个 TCP 请求，使用有界缓冲区处理背压和半关闭；连接结束后 B 自动补充连接。没有可用通道时 A 最多等待8秒并返回明确失败，不回退为本机直连。退出会中断活动转发并回收线程、套接字。A 的防火墙需允许 TCP 7403；代理入口固定绑定本机回环地址。该通道沿用当前受信任网线网络的传输边界，本身未额外加密；HTTPS 内容仍保持端到端 TLS。
+每条反向连接服务一个 TCP 请求，使用有界缓冲区处理背压和半关闭；连接结束后 B 自动补充连接。没有可用通道时 A 最多等待8秒并返回明确失败，不回退为本机直连。退出会中断活动转发并回收线程、套接字。A 的防火墙需允许 TCP 7403；本机代理继续绑定回环地址，虚拟机入口单独绑定 VMware 虚拟网卡。该通道沿用当前受信任网线网络的传输边界，本身未额外加密；HTTPS 内容仍保持端到端 TLS。
+
+### 虚拟机访问
+
+控制端菜单“允许虚拟机访问”默认勾选，`client.ini` 的 `[proxy] allow_virtual_machines=1` 控制此选项；旧配置缺少字段时也默认开启。菜单修改立即生效并保存，关闭时断开虚拟机的现有代理连接，本机代理不受影响。
+
+程序自动识别已启用的 VMware VMnet 私有 IPv4 网卡，仅在这些网卡的地址上监听 `local_port`，仅接受各自同网段的来源。不在物理网卡上开放代理；网卡或地址变化后每两秒检查并恢复。虚拟机入口提供 HTTP、HTTPS CONNECT 和 SOCKS5 TCP 转发，不提供内部 Ping/IP 隧道协议。
+
+首次使用，在宿主机右键 `build/controller/setup-vm-proxy.cmd`，选择“以管理员身份运行”，为当前程序、VMware 网卡和对应虚拟子网添加防火墙规则。网卡地址或代理端口变化后需重新运行；运行时附加 `-Remove` 可移除这些规则。WindowsStream 平时仍以普通权限运行。
+
+虚拟机浏览器使用自动分流配置 `http://192.168.211.1:1080/windowsstream.pac`。该地址只在已允许的 VMware 入口提供，沿用宿主机 `client.ini` 的内网网段与域名规则，并使用请求到达的 VMware 网卡地址作为代理；其他地址直连。它不包含宿主机的配对口令或宿主机原有的代理设置。
+
+运行 `windows/build-vm-browser.cmd` 构建 `WindowsStreamVMSetup.exe`。将 `build/vm-browser` 中的 EXE 和 `client.ini` 放到虚拟机当前用户目录后运行，程序先验证宿主机 PAC 可读，再备份并设置 Windows 当前用户的自动代理脚本，已有的其他手动/脚本代理不会被覆盖。浏览器跟随系统设置，不必逐个填写代理；配置持久保存，不需要在虚拟机常驻额外程序。运行同一个 EXE 并附加 `--restore` 可恢复原设置；修改宿主机地址后更新同目录 INI 并重新运行。
+
+本次实际安装于虚拟机当前用户的本地应用数据目录 `WindowsStreamVMBrowser`，已在虚拟机 Edge 中直接打开 Gitea 首页。宿主机 WindowsStream 仍需保持运行并允许虚拟机访问。
+
+不跟随系统 PAC 的工具仍需显式使用宿主机代理，例如 `curl.exe --proxy http://192.168.211.1:1080 --noproxy "" http://10.18.120.191:3000/`。虚拟机的 `127.0.0.1` 不指向宿主机；显式代理不可用时请求失败，不回退直连。
+
+仅构建控制端时运行 `windows/build-controller.cmd`。它在宿主机使用现有 VS 工具链生成 `build/controller/WindowsStream.next.exe`，将日志写入 `build/controller-build.log`，不替换正在运行的程序，也不重建或升级 B。编译成功后从托盘退出控制端，将旧 EXE 备份后用新 EXE 替换为 `WindowsStream.exe`，再启动。
+
+### 从虚拟机管理宿主机
+
+`windows/tools/host-control` 使用 Windows 自带的 OpenSSH。虚拟机保留私钥，共享目录只存放公钥；连接配置位于 `connection.ini`。宿主机只监听配置中的 VMware 网卡地址和端口，仅允许指定虚拟机通过密钥登录当前本地管理员账户，关闭密码登录及端口转发。组件安装和密钥配置依据 [Microsoft OpenSSH 文档](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse)。
+
+首次在宿主机右键 `setup-host.cmd`，选择“以管理员身份运行”。配置成功后自动写入共享目录的 `host-ready.ini` 和宿主机公钥，服务随宿主机启动。若已有运行中的其他 SSH 配置，脚本不覆盖。IP 变化后更新 `connection.ini` 并在宿主机重新运行。
+
+若 Windows 服务方式启动失败，脚本会记录目录权限、服务信息及前台启动诊断，自动改用 `WindowsStream-HostControl` 系统后台任务运行同一个 OpenSSH 程序。后台任务随宿主机启动并在异常退出后重试，服务方式同时关闭，避免端口冲突；连接地址、来源及密钥限制保持一致。
+
+虚拟机运行 `run-host.ps1 -Command '待执行的 PowerShell 命令'`，客户端会校验宿主机身份。可直接调用宿主机的 `windows/build-controller.cmd --no-pause`，随后运行 `setup-vm-proxy.ps1` 配置代理防火墙。`apply-controller.ps1` 通过一次性桌面任务正常退出旧控制端，备份后替换并启动新版，避免把窗口启动到 SSH 后台会话。
+
+需要撤销远程连接时，在宿主机以管理员身份运行 `disable-host.cmd`，停止服务、关闭自启并移除对应防火墙规则。首次配置日志为 `setup-host.log`；构建和程序更新日志位于 `windows/build`。当前环境的端到端结果应以实际连接、构建和 Gitea 检查为准。
 
 程序记录真实显卡、分辨率、刷新率、编码器名称及每两秒采集/编码/发送统计，静止画面不会用重复帧凑帧率。程序不修改两端系统显示模式。
 

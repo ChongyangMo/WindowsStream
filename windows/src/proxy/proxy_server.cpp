@@ -7,7 +7,7 @@ void ProxyServer::StartConfigured(const std::wstring& ini, const std::wstring& b
     if (!localPort || localPort > 65535 || !tunnelPort || tunnelPort > 65535 || localPort == tunnelPort) {
         LogLine("内网代理端口配置无效"); return;
     }
-    token_ = token; tunnelBind_ = bind; tasks_.Start();
+    token_ = token; tunnelBind_ = bind; ini_ = ini; tasks_.Start();
     int code = 0;
     auto local = proxy::Listen(tasks_, L"127.0.0.1", static_cast<uint16_t>(localPort), &code);
     if (!local) {
@@ -16,6 +16,13 @@ void ProxyServer::StartConfigured(const std::wstring& ini, const std::wstring& b
     }
     tasks_.Run([this, local] { AcceptLoop(local, nullptr); });
     tasks_.Run([this, bind, tunnelPort] { TunnelLoop(bind, static_cast<uint16_t>(tunnelPort)); });
+    vmAccess_.Start(static_cast<uint16_t>(localPort),
+        GetPrivateProfileIntW(L"proxy", L"allow_virtual_machines", 1, ini.c_str()) != 0,
+        [this](const proxy::Peer& peer, proxy::Tasks& requests) { Serve(peer, requests, true); });
+    tcpForwards_.Start(ini, [this](const proxy::Peer& peer, proxy::Tasks& requests, const std::string& host, uint16_t port) {
+        proxy::Request request; request.raw = true; request.host = host; request.port = port;
+        Forward(peer, requests, request);
+    });
     LogLine("内网代理已启动：本机 127.0.0.1:%u，等待被控端反向连接端口 %u", localPort, tunnelPort);
 }
 // 被控端通道监听绑定在网线地址上；地址缺失或被移除时持续重试，不需要重启控制端。
@@ -46,6 +53,10 @@ void ProxyServer::TunnelLoop(const std::wstring& bind, uint16_t port) {
     }
 }
 void ProxyServer::Stop() {
+    // 先唤醒等待反向连接的请求，再回收各入口任务。
+    tasks_.running = false; ready_.notify_all();
+    tcpForwards_.Stop();
+    vmAccess_.Stop();
     tasks_.running = false; ready_.notify_all(); tasks_.Stop();
     std::lock_guard lock(mutex_); idle_.clear(); authenticated_.clear();
 }
@@ -67,7 +78,7 @@ void ProxyServer::AcceptLoop(const proxy::Peer& listener, net::AddressWatch* wat
         if (tunnel && !net::PeerAllowed(tunnelBind_, from)) continue;  // 离开作用域即关闭
         proxy::Timeout(peer->value, 5000);
         tasks_.Run([this, peer, tunnel] {
-            if (!tunnel) { Serve(peer); return; }
+            if (!tunnel) { Serve(peer, tasks_); return; }
             if (!proxy::Authenticate(peer->value, token_, true)) { LogLine("内网代理被控端认证失败"); return; }
             std::lock_guard lock(mutex_);
             std::erase_if(idle_, [](const auto& item) { return proxy::Ready(item->value, false, 0); });
@@ -79,24 +90,37 @@ void ProxyServer::AcceptLoop(const proxy::Peer& listener, net::AddressWatch* wat
         });
     }
 }
-proxy::Peer ProxyServer::TakeTunnel() {
+proxy::Peer ProxyServer::TakeTunnel(const std::atomic<bool>& requesting) {
     std::unique_lock lock(mutex_);
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(8);
-    while (tasks_.running) {
+    while (tasks_.running && requesting) {
         while (!idle_.empty()) {
             auto peer = idle_.front(); idle_.pop_front();
             // 空闲通道不应发送数据；可读表示断开或协议错误，丢弃后等待重连。
             if (!proxy::Ready(peer->value, false, 0)) return peer;
         }
-        if (ready_.wait_until(lock, deadline) == std::cv_status::timeout) break;
+        if (std::chrono::steady_clock::now() >= deadline) break;
+        ready_.wait_until(lock, std::min(deadline, std::chrono::steady_clock::now() + std::chrono::milliseconds(200)));
     }
     return {};
 }
-void ProxyServer::Serve(const proxy::Peer& local) {
+void ProxyServer::Serve(const proxy::Peer& local, proxy::Tasks& requests, bool virtualMachine) {
     proxy::Request request;
     if (!proxy::Parse(local->value, request)) return;
-    auto tunnel = TakeTunnel();
+    if (!requests.running) return;
+    if (request.pac) {
+        if (virtualMachine) ServeVmPac(local);
+        else proxy::Text(local->value, "HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+        return;
+    }
+    if (virtualMachine && request.native) { proxy::Reply(local->value, request, 2); return; }
+    Forward(local, requests, request);
+}
+void ProxyServer::Forward(const proxy::Peer& local, proxy::Tasks& requests, const proxy::Request& request) {
+    if (!requests.running) return;
+    auto tunnel = TakeTunnel(requests.running);
     if (!tunnel) { LogLine("内网代理请求失败：被控端通道不可用"); proxy::Reply(local->value, request, 3); return; }
+    if (!requests.Watch(tunnel)) return;
     proxy::Timeout(tunnel->value, 15000);
     Writer command; command.u8(request.command);
     if (request.command != 4) {
@@ -111,5 +135,5 @@ void ProxyServer::Serve(const proxy::Peer& local) {
     if (!request.initial.empty() && !proxy::Text(tunnel->value, request.initial)) return;
     if (request.command == 4) LogLine("IP 隧道能力检测已转发");
     else LogLine("内网转发通道：%s:%u，类型 %u", request.host.c_str(), request.port, request.command);
-    proxy::Relay(tasks_, local->value, tunnel->value);
+    proxy::Relay(requests, local->value, tunnel->value);
 }

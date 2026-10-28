@@ -20,6 +20,8 @@ public:
     void Start() { running = true; }
     void Stop();
     Peer Track(SOCKET socket);
+    // 借用其他任务组的套接字；停止时一并 shutdown，不重复拥有或关闭句柄。
+    bool Watch(const Peer& peer);
     bool Run(std::function<void()> work);
     std::atomic<bool> running{false};
 private:

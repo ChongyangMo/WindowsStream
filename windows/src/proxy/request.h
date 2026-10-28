@@ -6,7 +6,8 @@ struct Request {
     std::string host;
     uint16_t port = 0;
     bool socks = false, connect = false;
-    bool native = false;
+    bool native = false, pac = false;
+    bool raw = false;
     uint8_t command = 1;
     std::string initial;
 };
