@@ -59,6 +59,7 @@
     <ClCompile Include="..\host\service\attention.cpp" />
     <ClCompile Include="..\host\service\desktop.cpp" />
     <ClCompile Include="..\host\service\launcher.cpp" />
+    <ClCompile Include="..\host\service\render.cpp" />
     <ClCompile Include="..\host\service\supervisor.cpp" />
     <ClCompile Include="..\host\session.cpp" />
     <ClCompile Include="..\host\stream.cpp" />

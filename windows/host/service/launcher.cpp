@@ -54,6 +54,8 @@ bool LaunchAgent(DWORD session, const std::wstring& attentionEvent, PROCESS_INFO
     CloseHandle(source);
     if (ok) {
         ok = SetTokenInformation(token, TokenSessionId, &session, sizeof session) != FALSE;
+        DWORD uiAccess = TRUE;
+        if (ok) ok = SetTokenInformation(token, TokenUIAccess, &uiAccess, sizeof uiAccess) != FALSE;
         if (ok) {
             wchar_t module[MAX_PATH]{};
             const DWORD size = GetModuleFileNameW(nullptr, module, MAX_PATH);
