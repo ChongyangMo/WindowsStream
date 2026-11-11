@@ -53,7 +53,6 @@ void Window::Open(const Profile& profile) {
 void Window::Attach(Tab& tab) {
     if (!tab.view || !IsWindow(tab.view)) return;
     if (!tab.borrowed) { tab.style = WS_OVERLAPPEDWINDOW; tab.exStyle = WS_EX_APPWINDOW; }
-    tab.menu = GetMenu(tab.view); if (tab.menu) SetMenu(tab.view, nullptr);
     SetWindowLongPtrW(tab.view, GWL_STYLE, (GetWindowLongPtrW(tab.view, GWL_STYLE) & ~WS_OVERLAPPEDWINDOW) | WS_CHILD | WS_CLIPSIBLINGS);
     SetWindowLongPtrW(tab.view, GWL_EXSTYLE, GetWindowLongPtrW(tab.view, GWL_EXSTYLE) & ~WS_EX_APPWINDOW);
     SetParent(tab.view, window_);
@@ -61,18 +60,15 @@ void Window::Attach(Tab& tab) {
     LogLine("远程标签页已就绪：%s", WideToUtf8(tab.profile.name).c_str());
 }
 void Window::Release(Tab& tab) {
-    if (tab.menu && GetMenu(window_) == tab.menu) SetMenu(window_, nullptr);
     if (tab.view && IsWindow(tab.view)) {
         if (tab.borrowed || tab.profile.primary) {
             ShowWindow(tab.view, SW_HIDE); SetParent(tab.view, nullptr);
             SetWindowLongPtrW(tab.view, GWL_STYLE, tab.style);
             SetWindowLongPtrW(tab.view, GWL_EXSTYLE, tab.exStyle);
-            if (tab.menu) SetMenu(tab.view, tab.menu);
-            if (tab.borrowed) SetWindowPlacement(tab.view, &tab.placement);
-            else SetWindowPos(tab.view, nullptr, 80, 80, 1200, 760, SWP_NOZORDER | SWP_FRAMECHANGED);
+            if (!tab.profile.primary) SetWindowPlacement(tab.view, &tab.placement);
             SetWindowPos(tab.view, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-            ShowWindowAsync(tab.view, SW_SHOWNORMAL);
-            LogLine("主连接已保留，桌面和内网代理继续运行");
+            ShowWindowAsync(tab.view, tab.profile.primary ? SW_HIDE : SW_SHOWNORMAL);
+            if (tab.profile.primary) LogLine("主连接已保留，桌面和内网代理继续运行");
         } else PostMessageW(tab.view, WM_CLOSE, 0, 0);
     }
     if (tab.process) CloseHandle(tab.process);
@@ -91,7 +87,6 @@ void Window::Detach(int index) {
     auto other = new Window(base_);
     if (!other->Create(SW_SHOWNORMAL)) return;
     auto tab = std::move(tabs_[static_cast<size_t>(index)]);
-    if (tab.menu && GetMenu(window_) == tab.menu) SetMenu(window_, nullptr);
     tabs_.erase(tabs_.begin() + index);
     if (tab.view) SetParent(tab.view, other->window_);
     other->tabs_.push_back(std::move(tab)); other->selected_ = 0; other->Refresh(); other->Select(0);
@@ -101,7 +96,6 @@ void Window::Detach(int index) {
     LogLine("远程标签页已移到新窗口，连接保持不变");
 }
 void Window::Poll() {
-    if (GetMenu(window_)) DrawMenuBar(window_);
     bool changed = false;
     for (auto& tab : tabs_) {
         if (tab.view && !IsWindow(tab.view)) { tab.view = nullptr; }
@@ -119,5 +113,6 @@ void Window::Poll() {
         }
     }
     if (changed) { Refresh(); Select(selected_); }
+    else RefreshNetworkMenu();
 }
 }

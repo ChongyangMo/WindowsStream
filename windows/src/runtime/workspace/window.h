@@ -12,7 +12,6 @@ struct Tab {
     DWORD processId = 0;
     bool borrowed = false;
     LONG_PTR style = 0, exStyle = 0;
-    HMENU menu = nullptr;
     WINDOWPLACEMENT placement{sizeof(WINDOWPLACEMENT)};
     ULONGLONG started = 0;
 };
@@ -38,9 +37,15 @@ private:
     void Poll();
     void DrawTab(const DRAWITEMSTRUCT& item);
     void Menu(int index);
+    const Tab* PrimaryTab() const;
+    void RefreshNetworkMenu();
+    void ClearNetworkMenu();
+    bool HandleNetworkCommand(UINT command);
     void Fullscreen();
     int HeaderHeight() const;
     HWND window_ = nullptr, tabsControl_ = nullptr, add_ = nullptr;
+    HMENU networkMenu_ = nullptr;
+    DWORD_PTR networkState_ = 0;
     std::wstring base_;
     std::vector<Tab> tabs_;
     int selected_ = -1;

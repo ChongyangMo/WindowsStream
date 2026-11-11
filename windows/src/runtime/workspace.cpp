@@ -19,7 +19,6 @@ int RunControllerWorkspace(HINSTANCE instance, int show, ViewerStartup& viewer) 
         else if (arg == L"--close-profile" && i + 1 < count) { initial = arguments[++i]; operation = 3; }
         else if (arg == L"--new-window") newConnection = true;
         else if (arg == L"--replace-workspace") replace = true;
-        else if (arg == L"--classic") { viewer.config = workspace::DefaultConfig(); viewer.primary = true; }
         else if (arg.size() && arg[0] != L'-') initial = arg;
     }
     if (arguments) LocalFree(arguments);
@@ -49,6 +48,7 @@ int RunControllerWorkspace(HINSTANCE instance, int show, ViewerStartup& viewer) 
                 current = FindWindowW(workspace::kWindowClass, nullptr);
             }
         } else {
+            if (initial.empty() && !newConnection && operation == 1) initial = config;
             COPYDATASTRUCT data{operation, static_cast<DWORD>((initial.size() + 1) * sizeof(wchar_t)), initial.data()};
             DWORD_PTR result = 0;
             if (SendMessageTimeoutW(existing, WM_COPYDATA, 0, reinterpret_cast<LPARAM>(&data), SMTO_ABORTIFHUNG, 3000, &result) && result) return 0;

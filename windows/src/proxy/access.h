@@ -8,13 +8,12 @@ class NetworkAccess {
 public:
     void Start(HWND window, const std::wstring& ini, ProxyServer& server);
     void Tick(bool connected);
+    LRESULT MenuState();
     bool Handle(UINT message, WPARAM wParam);
     void Stop();
 private:
-    void Update();
     HWND window_ = nullptr;
-    HMENU menu_ = nullptr;
-    std::wstring ini_, label_;
+    std::wstring ini_;
     ProxyServer* server_ = nullptr;
     proxy::SystemProxy lease_;
     IpTunnel tunnel_;

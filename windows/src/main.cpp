@@ -7,6 +7,7 @@
 #include "proxy/server.h"
 #include "locate/responder.h"
 #include "proxy/access.h"
+#include "proxy/network_menu.h"
 #include "diagnostics/metrics.h"
 #include "diagnostics/window_fit.h"
 #include "runtime/tray.h"
@@ -635,6 +636,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
     if (g_controllerTray.Handle(message, wParam, lParam)) return 0;
     if (g_networkAccess.Handle(message, wParam)) return 0;
     switch (message) {
+        case network_menu::kQuery:
+            return g_networkAccess.MenuState();
         case WM_SIZE:
             FitStreamWindow(hwnd, g_streamWidth, g_streamHeight);
             g_video.RequestResize();
@@ -922,7 +925,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     AddClipboardFormatListener(g_window);
     g_keyboardHook = SetWindowsHookExW(WH_KEYBOARD_LL, KeyboardHook, instance, 0);
     SetTimer(g_window, kTimer, 500, nullptr);
-    if (!hosted) ShowWindow(g_window, show == SW_HIDE ? SW_SHOWNORMAL : show);
+    if (!hosted && !g_startup.primary) ShowWindow(g_window, show == SW_HIDE ? SW_SHOWNORMAL : show);
 
     if (g_settings.token.size() < 32) {
         g_status = L"请配置连接口令";

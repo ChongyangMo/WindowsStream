@@ -1,4 +1,5 @@
 #include "tray.h"
+#include "workspace/catalog.h"
 #include "../../shared/app_icon.h"
 
 void ControllerTray::Start(HWND window) {
@@ -29,8 +30,15 @@ void ControllerTray::Stop() {
     window_ = nullptr;
 }
 void ControllerTray::Show() {
-    ShowWindow(window_, IsIconic(window_) ? SW_RESTORE : SW_SHOW);
-    SetForegroundWindow(window_);
+    const auto frame = GetAncestor(window_, GA_ROOT);
+    if (frame && frame != window_) {
+        ShowWindow(frame, IsIconic(frame) ? SW_RESTORE : SW_SHOW);
+        SetForegroundWindow(frame);
+        return;
+    }
+    const auto executable = workspace::ExecutablePath();
+    if (reinterpret_cast<INT_PTR>(ShellExecuteW(nullptr, nullptr, executable.c_str(), nullptr, nullptr, SW_SHOWNORMAL)) <= 32)
+        LogLine("无法从托盘打开工作区");
 }
 void ControllerTray::Menu() {
     HMENU menu = CreatePopupMenu();

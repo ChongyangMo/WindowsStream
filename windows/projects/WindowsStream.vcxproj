@@ -59,6 +59,7 @@
     <ClCompile Include="..\src\runtime\workspace.cpp" />
     <ClCompile Include="..\src\runtime\workspace\catalog.cpp" />
     <ClCompile Include="..\src\runtime\workspace\frame.cpp" />
+    <ClCompile Include="..\src\runtime\workspace\network_menu.cpp" />
     <ClCompile Include="..\src\runtime\workspace\picker.cpp" />
     <ClCompile Include="..\src\runtime\workspace\tabs.cpp" />
     <ClCompile Include="..\src\tunnel\manager.cpp" />
@@ -84,6 +85,7 @@
     <ClInclude Include="..\src\ping\client.h" />
     <ClInclude Include="..\src\ping\window.h" />
     <ClInclude Include="..\src\proxy\access.h" />
+    <ClInclude Include="..\src\proxy\network_menu.h" />
     <ClInclude Include="..\src\proxy\pac_server.h" />
     <ClInclude Include="..\src\proxy\request.h" />
     <ClInclude Include="..\src\proxy\server.h" />

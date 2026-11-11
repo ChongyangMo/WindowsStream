@@ -47,6 +47,7 @@
     <ClCompile Include="..\src\runtime\workspace.cpp"><Filter>src\runtime</Filter></ClCompile>
     <ClCompile Include="..\src\runtime\workspace\catalog.cpp"><Filter>src\runtime\workspace</Filter></ClCompile>
     <ClCompile Include="..\src\runtime\workspace\frame.cpp"><Filter>src\runtime\workspace</Filter></ClCompile>
+    <ClCompile Include="..\src\runtime\workspace\network_menu.cpp"><Filter>src\runtime\workspace</Filter></ClCompile>
     <ClCompile Include="..\src\runtime\workspace\picker.cpp"><Filter>src\runtime\workspace</Filter></ClCompile>
     <ClCompile Include="..\src\runtime\workspace\tabs.cpp"><Filter>src\runtime\workspace</Filter></ClCompile>
     <ClCompile Include="..\src\tunnel\manager.cpp"><Filter>src\tunnel</Filter></ClCompile>
@@ -70,6 +71,7 @@
     <ClInclude Include="..\src\ping\client.h"><Filter>src\ping</Filter></ClInclude>
     <ClInclude Include="..\src\ping\window.h"><Filter>src\ping</Filter></ClInclude>
     <ClInclude Include="..\src\proxy\access.h"><Filter>src\proxy</Filter></ClInclude>
+    <ClInclude Include="..\src\proxy\network_menu.h"><Filter>src\proxy</Filter></ClInclude>
     <ClInclude Include="..\src\proxy\pac_server.h"><Filter>src\proxy</Filter></ClInclude>
     <ClInclude Include="..\src\proxy\request.h"><Filter>src\proxy</Filter></ClInclude>
     <ClInclude Include="..\src\proxy\server.h"><Filter>src\proxy</Filter></ClInclude>

@@ -32,11 +32,9 @@ void Window::Refresh() {
         TCITEMW item{}; item.mask = TCIF_TEXT; item.pszText = tabs_[i].profile.name.data();
         TabCtrl_InsertItem(tabsControl_, static_cast<int>(i), &item);
     }
-    TabCtrl_SetCurSel(tabsControl_, selected_); Layout();
-    HMENU menu = nullptr;
-    for (const auto& tab : tabs_) if (tab.profile.primary && tab.menu) { menu = tab.menu; break; }
-    if (GetMenu(window_) != menu) SetMenu(window_, menu);
-    DrawMenuBar(window_);
+    TabCtrl_SetCurSel(tabsControl_, selected_);
+    RefreshNetworkMenu();
+    Layout();
 }
 void Window::Layout() {
     if (!tabsControl_) return;
@@ -174,9 +172,7 @@ LRESULT CALLBACK Window::Procedure(HWND window, UINT message, WPARAM wParam, LPA
         case WM_GETMINMAXINFO: reinterpret_cast<MINMAXINFO*>(lParam)->ptMinTrackSize = {420, 280}; return 0;
         case WM_COMMAND:
             if (LOWORD(wParam) == kWorkspaceNew) { self->NewConnection(); return 0; }
-            for (const auto& tab : self->tabs_) if (tab.profile.primary && tab.menu && tab.view) {
-                PostMessageW(tab.view, message, wParam, lParam); return 0;
-            }
+            if (self->HandleNetworkCommand(LOWORD(wParam))) return 0;
             break;
         case WM_NOTIFY: if (reinterpret_cast<NMHDR*>(lParam)->hwndFrom == self->tabsControl_ && reinterpret_cast<NMHDR*>(lParam)->code == TCN_SELCHANGE) {
             self->Select(TabCtrl_GetCurSel(self->tabsControl_)); return 0;
@@ -214,7 +210,7 @@ LRESULT CALLBACK Window::Procedure(HWND window, UINT message, WPARAM wParam, LPA
         case WM_CLOSE: DestroyWindow(window); return 0;
         case WM_DESTROY:
             self->picker_.Close();
-            SetMenu(window, nullptr);
+            self->ClearNetworkMenu();
             for (auto& tab : self->tabs_) self->Release(tab);
             self->tabs_.clear();
             std::erase(windows, self); if (windows.empty()) PostQuitMessage(0);
