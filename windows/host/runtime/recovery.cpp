@@ -18,19 +18,22 @@ void RecoveryLog(const std::filesystem::path& root, const std::string& message) 
         WriteFile(file, line.data(), static_cast<DWORD>(line.size()), &written, nullptr); CloseHandle(file);
     }
 }
-DWORD RecoveryDelay(const std::filesystem::path& root) {
+bool TakeRecoveryAttempt(const std::filesystem::path& root) {
     constexpr ULONGLONG window = 10 * 60 * 1000;
     const auto path = root / L".windowsstream-runtime" / L"recovery-state.ini";
     wchar_t value[32]{};
     GetPrivateProfileStringW(L"recovery", L"window_start", L"0", value, 32, path.c_str());
-    const uint64_t start = _wcstoui64(value, nullptr, 10), now = GetTickCount64();
-    auto count = GetPrivateProfileIntW(L"recovery", L"attempts", 0, path.c_str());
-    if (!start || now < start || now - start >= window) {
-        count = 0;
-        if (!WritePrivateProfileStringW(L"recovery", L"window_start", std::to_wstring(now).c_str(), path.c_str())) return INFINITE;
+    const auto start = _wcstoui64(value, nullptr, 10), now = GetTickCount64();
+    const bool fresh = !start || now < start || now - start >= window;
+    const auto count = fresh ? 0u : GetPrivateProfileIntW(L"recovery", L"attempts", 0, path.c_str());
+    if (count >= 3) {
+        RecoveryLog(root, "十分钟内已自动恢复三次，已暂停自动重启，请查看被控端日志");
+        return false;
     }
-    if (count >= 3) return static_cast<DWORD>(window - (now - start));
-    return WritePrivateProfileStringW(L"recovery", L"attempts", std::to_wstring(count + 1).c_str(), path.c_str()) ? 0 : INFINITE;
+    const bool saved = (!fresh || WritePrivateProfileStringW(L"recovery", L"window_start", std::to_wstring(now).c_str(), path.c_str())) &&
+        WritePrivateProfileStringW(L"recovery", L"attempts", std::to_wstring(count + 1).c_str(), path.c_str());
+    if (!saved) RecoveryLog(root, "无法保存恢复次数，已暂停自动重启");
+    return saved;
 }
 
 bool Enabled(const std::filesystem::path& ini) {
@@ -107,31 +110,21 @@ int RunRecovery(DWORD parentId, uint64_t created, HANDLE parent, HANDLE stop, HA
     if (!GetExitCodeProcess(parent, &code) || code == 0 || !Enabled(ini)) return 0;
     RecoveryLog(root, "检测到被控端异常退出，退出码 " + std::to_string(code) + "，准备恢复");
     while (WaitForSingleObject(stop, 2000) == WAIT_TIMEOUT && Enabled(ini)) {
-        DWORD delay = 0;
-        {
-            const HostUpdateLock updateLock(0);
-            if (!updateLock) continue;
-            HANDLE active = OpenMutexW(SYNCHRONIZE, FALSE, L"Local\\WindowsStreamHost");
-            if (active) { CloseHandle(active); return 0; }
-            delay = RecoveryDelay(root);
-            if (!delay) {
-                std::wstring command = L"\"" + target.wstring() + L"\" --background";
-                STARTUPINFOW startup{sizeof startup};
-                startup.dwFlags = STARTF_USESHOWWINDOW; startup.wShowWindow = SW_HIDE;
-                PROCESS_INFORMATION child{};
-                if (CreateProcessW(target.c_str(), command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr,
-                                   root.c_str(), &startup, &child)) {
-                    CloseHandle(child.hThread); CloseHandle(child.hProcess);
-                    RecoveryLog(root, "已重新启动被控端，进程 " + std::to_string(child.dwProcessId)); return 0;
-                }
-                RecoveryLog(root, "恢复被控端失败，系统错误 " + std::to_string(GetLastError()));
-            }
+        const HostUpdateLock updateLock(0);
+        if (!updateLock) continue;
+        HANDLE active = OpenMutexW(SYNCHRONIZE, FALSE, L"Local\\WindowsStreamHost");
+        if (active) { CloseHandle(active); return 0; }
+        if (!TakeRecoveryAttempt(root)) return 0;
+        std::wstring command = L"\"" + target.wstring() + L"\" --background";
+        STARTUPINFOW startup{sizeof startup};
+        startup.dwFlags = STARTF_USESHOWWINDOW; startup.wShowWindow = SW_HIDE;
+        PROCESS_INFORMATION child{};
+        if (CreateProcessW(target.c_str(), command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr,
+                           root.c_str(), &startup, &child)) {
+            CloseHandle(child.hThread); CloseHandle(child.hProcess);
+            RecoveryLog(root, "已重新启动被控端，进程 " + std::to_string(child.dwProcessId)); return 0;
         }
-        if (delay == INFINITE) { RecoveryLog(root, "无法保存恢复次数，已暂停自动重启"); return 0; }
-        if (delay) {
-            RecoveryLog(root, "十分钟内恢复次数达到上限，稍后重试");
-            if (WaitForSingleObject(stop, delay) != WAIT_TIMEOUT) return 0;
-        }
+        RecoveryLog(root, "恢复被控端失败，系统错误 " + std::to_string(GetLastError()));
     }
     return 0;
 }

@@ -77,8 +77,14 @@ bool HostChannel::Open(const HostConfig& config, const std::wstring& controller,
                 return false;
             }
         }
+        net::AddressWatch addressWatch(config.bindHost);
         while (running) {
             progress.fetch_add(1, std::memory_order_relaxed);
+            if (addressWatch.Lost()) {
+                LogLine("被控端监听地址 %s 已丢失，等待网卡恢复后重新监听", WideToUtf8(config.bindHost).c_str());
+                CloseListener();
+                break;
+            }
             fd_set readable;
             FD_ZERO(&readable); FD_SET(listener_, &readable);
             timeval wait{0, 250000};
