@@ -27,6 +27,10 @@
     <Link><AdditionalDependencies>d3d11.lib;dxgi.lib;mfplat.lib;mfuuid.lib;wmcodecdspuuid.lib;strmiids.lib;d3dcompiler.lib;imm32.lib;wininet.lib;comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\file_drag\gesture.cpp" />
+    <ClCompile Include="..\src\file_drag\drop.cpp" />
+    <ClCompile Include="..\src\file_drag\stream.cpp" />
+    <ClCompile Include="..\src\file_drag\transfer.cpp" />
     <ClCompile Include="..\shared\crypto.cpp" />
     <ClCompile Include="..\shared\locate.cpp" />
     <ClCompile Include="..\shared\net_health.cpp" />
@@ -67,6 +71,11 @@
     <ClCompile Include="..\src\video.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\shared\file_drag.h" />
+    <ClInclude Include="..\src\file_drag\gesture.h" />
+    <ClInclude Include="..\src\file_drag\drop.h" />
+    <ClInclude Include="..\src\file_drag\stream.h" />
+    <ClInclude Include="..\src\file_drag\transfer.h" />
     <ClInclude Include="..\shared\app_icon.h" />
     <ClInclude Include="..\shared\crypto.h" />
     <ClInclude Include="..\shared\host_control.h" />

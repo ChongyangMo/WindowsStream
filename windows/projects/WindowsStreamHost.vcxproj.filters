@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="host\file_drag"><UniqueIdentifier>{5e541a0c-8cc5-4596-9edc-efcbb9a42f6e}</UniqueIdentifier></Filter>
     <Filter Include="host"><UniqueIdentifier>{76838e42-d14a-4cf0-b65a-225c3947140c}</UniqueIdentifier></Filter>
     <Filter Include="host\locate"><UniqueIdentifier>{888f0c8b-cf33-48ea-9c67-3c9b9b144fbc}</UniqueIdentifier></Filter>
     <Filter Include="host\proxy"><UniqueIdentifier>{f62ac80d-defb-4205-b89d-2b36d03c5e0a}</UniqueIdentifier></Filter>
@@ -13,6 +14,8 @@
     <Filter Include="src"><UniqueIdentifier>{349bdbc3-ba56-4f08-8635-dcd865d2673b}</UniqueIdentifier></Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\host\file_drag\capture.cpp"><Filter>host\file_drag</Filter></ClCompile>
+    <ClCompile Include="..\host\file_drag\sender.cpp"><Filter>host\file_drag</Filter></ClCompile>
     <ClCompile Include="..\host\capture_diag.cpp"><Filter>host</Filter></ClCompile>
     <ClCompile Include="..\host\capture_gpu.cpp"><Filter>host</Filter></ClCompile>
     <ClCompile Include="..\host\capture.cpp"><Filter>host</Filter></ClCompile>
@@ -59,6 +62,9 @@
     <ClCompile Include="..\shared\telemetry.cpp"><Filter>shared</Filter></ClCompile>
     <ClCompile Include="..\shared\update_package.cpp"><Filter>shared</Filter></ClCompile>
     <ClCompile Include="..\src\common.cpp"><Filter>src</Filter></ClCompile>
+    <ClInclude Include="..\shared\file_drag.h"><Filter>shared</Filter></ClInclude>
+    <ClInclude Include="..\host\file_drag\capture.h"><Filter>host\file_drag</Filter></ClInclude>
+    <ClInclude Include="..\host\file_drag\sender.h"><Filter>host\file_drag</Filter></ClInclude>
     <ClInclude Include="..\host\capture_diag.h"><Filter>host</Filter></ClInclude>
     <ClInclude Include="..\host\capture_gpu.h"><Filter>host</Filter></ClInclude>
     <ClInclude Include="..\host\capture.h"><Filter>host</Filter></ClInclude>

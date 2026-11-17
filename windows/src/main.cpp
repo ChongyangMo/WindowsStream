@@ -3,6 +3,7 @@
 #include "keymap.h"
 #include "net.h"
 #include "video.h"
+#include "file_drag/gesture.h"
 #include "updates/server.h"
 #include "proxy/server.h"
 #include "locate/responder.h"
@@ -52,6 +53,7 @@ std::wstring g_connectedHost;  // 当前连接目标
 
 bool AutoHost() { return g_settings.host.empty() || _wcsicmp(g_settings.host.c_str(), L"auto") == 0; }
 VideoPipeline g_video;
+filedrag::Gesture g_fileDrag;
 StreamDiagnostics g_diagnostics;
 std::deque<std::pair<int64_t, int64_t>> g_clockSamples;
 std::mutex g_connectionMutex;
@@ -366,6 +368,7 @@ void NetworkLoop() {
             std::lock_guard lock(g_connectionMutex);
             g_connection = connection;
         }
+        g_fileDrag.Connect(g_window, connection);
         PostStatus(L"");
         connection->Send(MsgRequestKeyframe);
 
@@ -438,9 +441,11 @@ void NetworkLoop() {
                     break;
                 }
                 default:
+                    g_fileDrag.Receive(type, payload);
                     break;
             }
         }
+        g_fileDrag.Disconnect();
         {
             std::lock_guard lock(g_connectionMutex);
             g_connection.reset();
@@ -511,6 +516,7 @@ void SendScroll(int dx, int dy) {
 
 // 失去焦点或切换时松开 Windows 上所有按键和鼠标键，避免卡键。
 void ReleaseAllRemote() {
+    g_fileDrag.Cancel();
     if (!g_pressedRemoteKeys.empty() || g_buttonsDown != 0) {
         SendToHost(MsgReleaseAll, Writer{});
     }
@@ -659,6 +665,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
             return 0;
         }
         case WM_SETCURSOR:
+            if (g_fileDrag.Dragging()) break;
             if (LOWORD(lParam) == HTCLIENT) {
                 SetCursor(g_remoteCursor && Connected() ? g_remoteCursor : LoadCursorW(nullptr, IDC_ARROW));
                 return TRUE;
@@ -666,6 +673,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
             break;
 
         case WM_MOUSEMOVE: {
+            if (g_fileDrag.Dragging()) return 0;
             uint16_t x, y;
             if (Connected() && MapPoint(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), x, y) && (x != g_lastX || y != g_lastY)) {
                 g_lastX = x;
@@ -675,10 +683,15 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
                 w.u16(y);
                 SendToHost(MsgMouseMove, w);
             }
+            if (g_buttonsDown == 1) g_fileDrag.Probe(hwnd, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
             return 0;
         }
-        case WM_LBUTTONDOWN: SendButton(0, true, lParam); return 0;
-        case WM_LBUTTONUP: SendButton(0, false, lParam); return 0;
+        case WM_LBUTTONDOWN:
+            if (!g_fileDrag.Dragging()) { g_fileDrag.Press(); SendButton(0, true, lParam); }
+            return 0;
+        case WM_LBUTTONUP:
+            if (!g_fileDrag.Dragging()) { g_fileDrag.Cancel(); SendButton(0, false, lParam); }
+            return 0;
         case WM_RBUTTONDOWN: SendButton(1, true, lParam); return 0;
         case WM_RBUTTONUP: SendButton(1, false, lParam); return 0;
         case WM_MBUTTONDOWN: SendButton(2, true, lParam); return 0;
@@ -748,6 +761,15 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
             return 0;
         case WM_KILLFOCUS:
             ReleaseAllRemote();
+            return 0;
+        case WM_CAPTURECHANGED:
+            if (g_buttonsDown) ReleaseAllRemote();
+            return 0;
+        case filedrag::kOfferReady:
+            if (auto offer = g_fileDrag.Take(hwnd)) {
+                ReleaseAllRemote();
+                g_fileDrag.Drop(hwnd, offer);
+            }
             return 0;
 
         case WM_CLIPBOARDUPDATE:
@@ -857,7 +879,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
         return 0;
     }
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    const HRESULT ole = OleInitialize(nullptr);
     WSADATA wsa;
     WSAStartup(MAKEWORD(2, 2), &wsa);
     LoadSettings();
@@ -951,7 +973,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     proxyServer.Stop();
     if (g_keyboardHook) UnhookWindowsHookEx(g_keyboardHook);
     WSACleanup();
-    CoUninitialize();
+    if (SUCCEEDED(ole)) OleUninitialize();
     if (singleInstance) CloseHandle(singleInstance);
     return 0;
 }

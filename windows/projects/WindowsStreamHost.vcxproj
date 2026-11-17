@@ -27,6 +27,8 @@
     <Link><AdditionalDependencies>d3d11.lib;dxgi.lib;mfplat.lib;mfuuid.lib;wmcodecdspuuid.lib;strmiids.lib;winmm.lib;winhttp.lib;wtsapi32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\host\file_drag\capture.cpp" />
+    <ClCompile Include="..\host\file_drag\sender.cpp" />
     <ClCompile Include="..\host\capture_diag.cpp" />
     <ClCompile Include="..\host\capture_gpu.cpp" />
     <ClCompile Include="..\host\capture.cpp" />
@@ -75,6 +77,9 @@
     <ClCompile Include="..\src\common.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\shared\file_drag.h" />
+    <ClInclude Include="..\host\file_drag\capture.h" />
+    <ClInclude Include="..\host\file_drag\sender.h" />
     <ClInclude Include="..\host\capture_diag.h" />
     <ClInclude Include="..\host\capture_gpu.h" />
     <ClInclude Include="..\host\capture.h" />

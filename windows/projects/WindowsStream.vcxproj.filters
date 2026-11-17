@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="src\file_drag"><UniqueIdentifier>{1156a90d-4d2a-4d2a-b0f0-1f8833818ae7}</UniqueIdentifier></Filter>
     <Filter Include="resources"><UniqueIdentifier>{df567233-9d5b-4ead-bb7b-69e32e1cfff3}</UniqueIdentifier></Filter>
     <Filter Include="shared"><UniqueIdentifier>{2734b1f8-4bd5-4c37-9679-24f5d86f4380}</UniqueIdentifier></Filter>
     <Filter Include="shared\proxy"><UniqueIdentifier>{32fdc222-92cf-44ea-9e41-18e63fb1a5fc}</UniqueIdentifier></Filter>
@@ -15,6 +16,10 @@
     <Filter Include="src\updates"><UniqueIdentifier>{510d7cb1-54a9-46ce-8e10-4d698fb4bf64}</UniqueIdentifier></Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\file_drag\gesture.cpp"><Filter>src\file_drag</Filter></ClCompile>
+    <ClCompile Include="..\src\file_drag\drop.cpp"><Filter>src\file_drag</Filter></ClCompile>
+    <ClCompile Include="..\src\file_drag\stream.cpp"><Filter>src\file_drag</Filter></ClCompile>
+    <ClCompile Include="..\src\file_drag\transfer.cpp"><Filter>src\file_drag</Filter></ClCompile>
     <ClCompile Include="..\shared\crypto.cpp"><Filter>shared</Filter></ClCompile>
     <ClCompile Include="..\shared\locate.cpp"><Filter>shared</Filter></ClCompile>
     <ClCompile Include="..\shared\net_health.cpp"><Filter>shared</Filter></ClCompile>
@@ -53,6 +58,11 @@
     <ClCompile Include="..\src\tunnel\manager.cpp"><Filter>src\tunnel</Filter></ClCompile>
     <ClCompile Include="..\src\updates\server.cpp"><Filter>src\updates</Filter></ClCompile>
     <ClCompile Include="..\src\video.cpp"><Filter>src</Filter></ClCompile>
+    <ClInclude Include="..\shared\file_drag.h"><Filter>shared</Filter></ClInclude>
+    <ClInclude Include="..\src\file_drag\gesture.h"><Filter>src\file_drag</Filter></ClInclude>
+    <ClInclude Include="..\src\file_drag\drop.h"><Filter>src\file_drag</Filter></ClInclude>
+    <ClInclude Include="..\src\file_drag\stream.h"><Filter>src\file_drag</Filter></ClInclude>
+    <ClInclude Include="..\src\file_drag\transfer.h"><Filter>src\file_drag</Filter></ClInclude>
     <ClInclude Include="..\shared\app_icon.h"><Filter>shared</Filter></ClInclude>
     <ClInclude Include="..\shared\crypto.h"><Filter>shared</Filter></ClInclude>
     <ClInclude Include="..\shared\host_control.h"><Filter>shared</Filter></ClInclude>
