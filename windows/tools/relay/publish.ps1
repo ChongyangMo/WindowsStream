@@ -1,6 +1,7 @@
 param (
     [Parameter(Mandatory)][string]$Release,
-    [Parameter(Mandatory)][string]$PreviousRelease
+    [Parameter(Mandatory)][string]$PreviousRelease,
+    [switch]$Universal
 )
 
 $ErrorActionPreference = 'Stop'
@@ -9,12 +10,13 @@ $proxy = 'http://127.0.0.1:1080'
 $site = 'https://sdserver.luxvisions-inno.com'
 $stageExe = 'maintenance/gitea-server/netdisk.next.exe'
 $stageManifest = 'maintenance/gitea-server/package-hashes.txt'
-$serverConfig = 'config/windowsstream-relay.ini'
+$configName = if ($Universal) { 'windowsstream-enrollment.ini' } else { 'windowsstream-relay.ini' }
+$serverConfig = 'config/' + $configName
 $oldExe = Join-Path $PreviousRelease 'netdisk.next.exe'
 $oldManifest = Join-Path $PreviousRelease 'package-hashes.txt'
 $newExe = Join-Path $Release 'netdisk.next.exe'
 $newManifest = Join-Path $Release 'package-hashes.txt'
-$newConfig = Join-Path $Release 'windowsstream-relay.ini'
+$newConfig = Join-Path $Release $configName
 
 function Get-LocalHash([string]$Path) { (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() }
 
@@ -63,7 +65,13 @@ if ($status.restart.in_progress -or !$status.backend_healthy) { throw '生产后
 Confirm-Remote 'netdisk.exe' $oldExe
 Confirm-Remote $stageExe $oldExe
 Confirm-Remote $stageManifest $oldManifest
-if (Get-RemoteHash $serverConfig) { throw '服务器已有中转配置，需要保留已登记的设备。' }
+$existingConfig = Get-RemoteHash $serverConfig
+if ($existingConfig -and $existingConfig -ne (Get-LocalHash $newConfig)) {
+    throw '服务器已有不同的中转配置。'
+}
+if ($Universal) {
+    Confirm-Remote 'config/windowsstream-relay.ini' (Join-Path $PreviousRelease 'windowsstream-relay.ini')
+}
 
 $manifest = [IO.File]::ReadAllText($oldManifest)
 $entry = [regex]'(?m)^[a-fA-F0-9]{64}(?=[ \t]+netdisk\.next\.exe\r?$)'
@@ -71,7 +79,7 @@ if ($entry.Matches($manifest).Count -ne 1) { throw '后端发布清单条目不�
 [IO.File]::WriteAllText($newManifest, $entry.Replace($manifest, (Get-LocalHash $newExe)), [Text.UTF8Encoding]::new($false))
 
 try {
-    Upload-Artifact $newConfig $serverConfig
+    if (!$existingConfig) { Upload-Artifact $newConfig $serverConfig }
     Upload-Artifact $newExe $stageExe
     Upload-Artifact $newManifest $stageManifest
     Write-Output '中转发布包已上传并校验，服务云将短暂重启。'
@@ -91,7 +99,7 @@ try {
             Restart-Backend
             Confirm-Remote 'netdisk.exe' $oldExe
         }
-        if ((Get-RemoteHash $serverConfig) -eq (Get-LocalHash $newConfig)) {
+        if (!$existingConfig -and (Get-RemoteHash $serverConfig) -eq (Get-LocalHash $newConfig)) {
             Invoke-WebRequest "$base/path?path=$([uri]::EscapeDataString($serverConfig))" -Proxy $proxy -Method Delete -TimeoutSec 12 | Out-Null
         }
         Write-Output '已恢复发布前的服务云版本。'

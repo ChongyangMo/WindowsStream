@@ -12,13 +12,13 @@ import (
 )
 
 type config struct {
-	role      string
-	endpoint  string
-	server    string
-	httpProxy string
-	device    string
-	token     string
-	local     string
+	role       string
+	endpoint   string
+	server     string
+	httpProxy  string
+	device     string
+	token      string
+	local      string
 	enrollment string
 	viewerHash string
 }
@@ -35,7 +35,7 @@ func loadConfig(path string) (config, error) {
 		"role": &c.role, "endpoint": &c.endpoint, "server_address": &c.server,
 		"http_proxy": &c.httpProxy, "device": &c.device, "token": &c.token,
 		"local_address": &c.local,
-		"enrollment": &c.enrollment, "viewer_sha256": &c.viewerHash,
+		"enrollment":    &c.enrollment, "viewer_sha256": &c.viewerHash,
 	}
 	scanner := bufio.NewScanner(file)
 	for lineNumber := 1; scanner.Scan(); lineNumber++ {

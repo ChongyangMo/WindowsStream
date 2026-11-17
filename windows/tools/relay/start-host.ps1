@@ -3,8 +3,14 @@ try {
     . (Join-Path $PSScriptRoot 'takeover.ps1')
     $hostProgram = Join-Path $PSScriptRoot 'WindowsStreamHost.exe'
     $relayProgram = Join-Path $PSScriptRoot 'WindowsStreamBridge.exe'
-    Assert-StreamFiles @($hostProgram, $relayProgram, (Join-Path $PSScriptRoot 'host.ini'), (Join-Path $PSScriptRoot 'relay.ini'))
+    Assert-StreamFiles @($hostProgram, $relayProgram)
     Invoke-StreamLock 'Local\WindowsStreamHostUpdate' {
+        $pairing = Join-Path $PSScriptRoot 'pairing.ps1'
+        if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'enrollment.ini')) {
+            . $pairing
+            Initialize-RelayHost $PSScriptRoot
+        }
+        Assert-StreamFiles @((Join-Path $PSScriptRoot 'host.ini'), (Join-Path $PSScriptRoot 'relay.ini'))
         $old = @(foreach ($entry in Get-StreamProcesses 'WindowsStreamHost.exe') {
             if ($entry.Instance.CommandLine -match '\s--(?:server-\S+|apply-update|stop-user-host)(?:\s|$)') {
                 $entry.Process.Dispose()
