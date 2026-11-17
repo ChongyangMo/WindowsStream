@@ -33,6 +33,7 @@ private:
     void CloseTab(int index);
     void Detach(int index);
     void Release(Tab& tab);
+    void ReleaseTabs();
     void Attach(Tab& tab);
     void Poll();
     void DrawTab(const DRAWITEMSTRUCT& item);

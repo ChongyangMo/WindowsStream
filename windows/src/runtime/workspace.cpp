@@ -80,6 +80,13 @@ int RunControllerWorkspace(HINSTANCE instance, int show, ViewerStartup& viewer) 
 bool ViewerHasFocus(HWND viewer) {
     return IsWindowVisible(viewer) && GetForegroundWindow() == GetAncestor(viewer, GA_ROOT);
 }
+bool ViewerWindowAlive(HWND viewer) {
+    if (!IsWindow(viewer)) return false;
+    if (!(GetWindowLongPtrW(viewer, GWL_STYLE) & WS_CHILD)) return true;
+    const auto parent = GetParent(viewer);
+    wchar_t name[64]{};
+    return parent && GetClassNameW(parent, name, 64) > 0 && wcscmp(name, workspace::kWindowClass) == 0;
+}
 bool HandleWorkspaceShortcut(HWND viewer, UINT message, WPARAM key) {
     if (!(GetWindowLongPtrW(viewer, GWL_STYLE) & WS_CHILD)) return false;
     const auto parent = GetAncestor(viewer, GA_ROOT);

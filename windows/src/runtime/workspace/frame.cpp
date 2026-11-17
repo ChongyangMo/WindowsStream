@@ -207,12 +207,16 @@ LRESULT CALLBACK Window::Procedure(HWND window, UINT message, WPARAM wParam, LPA
                     CanonicalPath(path) == CanonicalPath(self->base_) && LoadProfiles(self->base_).front().primary});
             ShowWindow(window, SW_RESTORE); SetForegroundWindow(window); return TRUE;
         }
-        case WM_CLOSE: DestroyWindow(window); return 0;
+        case WM_CLOSE:
+            self->picker_.Close();
+            // 先把主连接脱离工作区，避免销毁父窗口时失去仍在运行的观看窗口。
+            self->ReleaseTabs();
+            DestroyWindow(window);
+            return 0;
         case WM_DESTROY:
             self->picker_.Close();
             self->ClearNetworkMenu();
-            for (auto& tab : self->tabs_) self->Release(tab);
-            self->tabs_.clear();
+            self->ReleaseTabs();
             std::erase(windows, self); if (windows.empty()) PostQuitMessage(0);
             return 0;
         case WM_NCDESTROY: SetWindowLongPtrW(window, GWLP_USERDATA, 0); delete self; return 0;

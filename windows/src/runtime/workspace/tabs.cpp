@@ -74,6 +74,10 @@ void Window::Release(Tab& tab) {
     if (tab.process) CloseHandle(tab.process);
     tab.process = nullptr;
 }
+void Window::ReleaseTabs() {
+    for (auto& tab : tabs_) Release(tab);
+    tabs_.clear();
+}
 void Window::CloseTab(int index) {
     if (index < 0 || static_cast<size_t>(index) >= tabs_.size()) return;
     LogLine("关闭远程标签页：%s", WideToUtf8(tabs_[static_cast<size_t>(index)].profile.name).c_str());

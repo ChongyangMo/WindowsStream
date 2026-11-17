@@ -18,3 +18,4 @@ struct ViewerStartup {
 int RunControllerWorkspace(HINSTANCE instance, int show, ViewerStartup& viewer);
 bool HandleWorkspaceShortcut(HWND viewer, UINT message, WPARAM key);
 bool ViewerHasFocus(HWND viewer);
+bool ViewerWindowAlive(HWND viewer);

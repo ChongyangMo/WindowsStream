@@ -875,9 +875,16 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
             ShowWindowAsync(existing, IsIconic(existing) ? SW_RESTORE : SW_SHOW);
             SetForegroundWindow(existing);
             LogLine("控制端已经运行，已请求显示现有窗口");
+            CloseHandle(singleInstance);
+            return 0;
         }
-        CloseHandle(singleInstance);
-        return 0;
+        // 工作区刚退出时，旧观看进程可能还在清理连接和释放单实例锁。
+        const auto status = WaitForSingleObject(singleInstance, 4000);
+        if (status != WAIT_OBJECT_0 && status != WAIT_ABANDONED) {
+            LogLine("原观看进程还未退出，无法重新打开连接");
+            CloseHandle(singleInstance);
+            return 0;
+        }
     }
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     const HRESULT ole = OleInitialize(nullptr);
@@ -965,11 +972,23 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
         g_networkThread = std::thread(NetworkLoop);
     }
 
+    // 线程计时器在观看窗口被父工作区销毁后仍可触发。
+    const auto workspaceMonitor = SetTimer(nullptr, 0, 250, nullptr);
+    unsigned missingWindowChecks = 0;
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
+        if (workspaceMonitor && !msg.hwnd && msg.message == WM_TIMER && msg.wParam == workspaceMonitor) {
+            missingWindowChecks = ViewerWindowAlive(g_window) ? 0 : missingWindowChecks + 1;
+            if (missingWindowChecks >= 3) {
+                LogLine("观看窗口已随工作区关闭，正在释放连接");
+                break;
+            }
+            continue;
+        }
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
+    if (workspaceMonitor) KillTimer(nullptr, workspaceMonitor);
 
     g_running = false;
     g_networkAccess.Stop();
