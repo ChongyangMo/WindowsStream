@@ -2,6 +2,12 @@
 
 InputInjector::~InputInjector() { ReleaseAll(); }
 
+bool InputInjector::FinishFileDrag() {
+    // 取消原拖拽后再松开左键，避免被控机上的文件被放进任何目录。
+    const bool escaped = Key(1, true) && Key(1, false);
+    return Button(0, false) && escaped;
+}
+
 bool InputInjector::Submit(INPUT input) {
     if (servermode::SecureAgent() && !desktop_.Attach()) return false;
     if (SendInput(1, &input, sizeof input) == 1) return true;

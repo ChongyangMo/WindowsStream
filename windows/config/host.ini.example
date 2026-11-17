@@ -16,6 +16,7 @@ bitrate_mbps = 48
 
 [permissions]
 clipboard = 1
+file_drag = 1
 
 [updates]
 enabled = 1

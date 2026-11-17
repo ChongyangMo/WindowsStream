@@ -4,6 +4,7 @@
 #include "cursor.h"
 #include "input.h"
 #include "discovery.h"
+#include "file_drag/sender.h"
 #include "locate/locator.h"
 #include "service/service.h"
 #include <cstdio>
@@ -28,6 +29,8 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
     auto initialTelemetry = EncodeTelemetry(stream.Telemetry());
     if (!channel.Send(MsgTelemetry, initialTelemetry)) return false;
     ClipboardBridge clipboard(owner);
+    filedrag::Sender fileDrag(channel);
+    if (config.fileDrag && !servermode::SecureAgent() && !fileDrag.Start()) return false;
     std::atomic<bool> connected{true};
     std::atomic<bool> forceKeyframe{true};
     std::thread receiver([&] {
@@ -59,7 +62,7 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
                     // 首版按被控端真实主屏和配置输出，不修改分辨率或创建虚拟屏。
                     break;
                 default:
-                    input.Handle(type, payload);
+                    if (!fileDrag.Handle(type, payload, input)) input.Handle(type, payload);
                     break;
             }
         }

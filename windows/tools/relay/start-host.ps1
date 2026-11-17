@@ -1,18 +1,21 @@
 $ErrorActionPreference = 'Stop'
 try {
+    . (Join-Path $PSScriptRoot 'takeover.ps1')
     $hostProgram = Join-Path $PSScriptRoot 'WindowsStreamHost.exe'
     $relayProgram = Join-Path $PSScriptRoot 'WindowsStreamBridge.exe'
-    $hostProcesses = @(Get-CimInstance Win32_Process -Filter "Name='WindowsStreamHost.exe'" |
-        Where-Object SessionId -eq ([Diagnostics.Process]::GetCurrentProcess().SessionId))
-    if ($hostProcesses | Where-Object ExecutablePath -ne $hostProgram) {
-        throw '请先从正在运行的 WindowsStream 被控端点「退出」，再启动中转。'
-    }
-    if (!$hostProcesses.Count) {
-        Start-Process -FilePath $hostProgram -WorkingDirectory $PSScriptRoot
-    }
-    $relays = @(Get-CimInstance Win32_Process -Filter "Name='WindowsStreamBridge.exe'" |
-        Where-Object ExecutablePath -eq $relayProgram)
-    if (!$relays.Count) {
+    Assert-StreamFiles @($hostProgram, $relayProgram, (Join-Path $PSScriptRoot 'host.ini'), (Join-Path $PSScriptRoot 'relay.ini'))
+    Invoke-StreamLock 'Local\WindowsStreamHostUpdate' {
+        $old = @(foreach ($entry in Get-StreamProcesses 'WindowsStreamHost.exe') {
+            if ($entry.Instance.CommandLine -match '\s--(?:server-\S+|apply-update|stop-user-host)(?:\s|$)') {
+                $entry.Process.Dispose()
+            } else { $entry }
+        })
+        Stop-StreamProcesses $old 'host'
+        Stop-OldBridges $relayProgram
+        $started = Start-Process -FilePath $hostProgram -WorkingDirectory $PSScriptRoot -PassThru
+        try {
+            if (!$started.WaitForInputIdle(8000) -or $started.HasExited) { throw '新版 WindowsStream 被控端未能启动。' }
+        } finally { $started.Dispose() }
         Start-Process -FilePath $relayProgram -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
     }
 } catch {

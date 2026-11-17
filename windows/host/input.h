@@ -8,6 +8,8 @@ public:
     ~InputInjector();
     bool Handle(uint8_t type, const std::vector<uint8_t>& payload);
     void ReleaseAll();
+    bool CanHandOffDrag() const { return buttons_.size() == 1 && buttons_.count(0) && !keys_.count(1); }
+    bool FinishFileDrag();
 private:
     bool Submit(INPUT input);
     bool Move(uint16_t x, uint16_t y);

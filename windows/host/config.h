@@ -8,6 +8,7 @@ struct HostConfig {
     std::string token;
     bool reverse = true;
     bool clipboard = true;
+    bool fileDrag = true;
     int maxWidth = 1920;
     int maxHeight = 1080;
     bool nativeResolution = true;

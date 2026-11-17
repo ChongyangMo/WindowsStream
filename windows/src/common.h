@@ -39,6 +39,12 @@ enum MessageType : uint8_t {
     MsgMonitorMode = 46,
     MsgRequestKeyframe = 50,
     MsgSecureAttention = 51,
+    MsgFileDragAvailable = 60,
+    MsgFileDragProbe = 61,
+    MsgFileDragOffer = 62,
+    MsgFileDragRead = 63,
+    MsgFileDragData = 64,
+    MsgFileDragClose = 65,
 };
 
 constexpr uint32_t kProtocolVersion = 2;
