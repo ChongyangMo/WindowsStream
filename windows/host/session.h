@@ -7,8 +7,10 @@ class HostServer {
 public:
     void Run(const HostConfig& config, HWND owner, const std::function<void(const std::wstring&)>& status);
     void Stop();
+    std::wstring ConnectedLocalAddress();
 private:
     std::atomic<bool> running_{true};
     std::mutex mutex_;
     std::shared_ptr<HostChannel> channel_;
+    std::wstring connectedLocalAddress_;
 };

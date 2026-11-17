@@ -177,6 +177,11 @@ void HostServer::Stop() {
     if (channel_) channel_->Shutdown();
 }
 
+std::wstring HostServer::ConnectedLocalAddress() {
+    std::lock_guard lock(mutex_);
+    return connectedLocalAddress_;
+}
+
 void HostServer::Run(const HostConfig& config, HWND owner, const std::function<void(const std::wstring&)>& status) {
     const HRESULT com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     const HRESULT media = SUCCEEDED(com) ? MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET) : com;
@@ -219,6 +224,10 @@ void HostServer::Run(const HostConfig& config, HWND owner, const std::function<v
                 if (!running_) channel->Shutdown();
             }
             if (running_ && channel->Authenticate(config.token, stream.Width(), stream.Height(), stream.Fps())) {
+                {
+                    std::lock_guard lock(mutex_);
+                    connectedLocalAddress_ = channel->LocalAddress();
+                }
                 status(L"已连接");
                 LogLine("控制端已通过认证：%s", WideToUtf8(Locator().Current()).c_str());
                 if (config.reverse) Locator().Succeeded();
@@ -236,6 +245,7 @@ void HostServer::Run(const HostConfig& config, HWND owner, const std::function<v
             }
             {
                 std::lock_guard lock(mutex_);
+                connectedLocalAddress_.clear();
                 channel_.reset();
             }
             channel->Shutdown();

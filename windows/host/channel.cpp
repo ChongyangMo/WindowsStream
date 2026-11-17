@@ -22,6 +22,15 @@ HostChannel::~HostChannel() {
     if (socket_ != INVALID_SOCKET) closesocket(socket_);
 }
 
+std::wstring HostChannel::LocalAddress() const {
+    sockaddr_in address{};
+    int length = sizeof address;
+    wchar_t text[INET_ADDRSTRLEN]{};
+    if (getsockname(socket_, reinterpret_cast<sockaddr*>(&address), &length) != 0 ||
+        !InetNtopW(AF_INET, &address.sin_addr, text, INET_ADDRSTRLEN)) return {};
+    return text;
+}
+
 bool HostChannel::Open(const HostConfig& config, const std::wstring& controller, std::atomic<bool>& running) {
     sockaddr_in address{};
     address.sin_family = AF_INET;

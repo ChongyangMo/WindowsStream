@@ -7,6 +7,27 @@ namespace {
 bool LinkLocal(const IN_ADDR& address) {
     return address.S_un.S_un_b.s_b1 == 169 && address.S_un.S_un_b.s_b2 == 254;
 }
+
+std::wstring IPv4Text(const IN_ADDR& address) {
+    if (address.s_addr == INADDR_ANY) return {};
+    wchar_t text[INET_ADDRSTRLEN]{};
+    return InetNtopW(AF_INET, &address, text, INET_ADDRSTRLEN) ? text : L"";
+}
+
+std::wstring RouteSource(const SOCKADDR_INET& destination, ULONG interfaceIndex) {
+    MIB_IPFORWARD_ROW2 route{};
+    SOCKADDR_INET source{};
+    if (GetBestRoute2(nullptr, interfaceIndex, nullptr, &destination, 0, &route, &source) != NO_ERROR ||
+        source.si_family != AF_INET) return {};
+    return IPv4Text(source.Ipv4.sin_addr);
+}
+
+struct LanAddress {
+    std::wstring first, gatewaySource;
+    bool multiple = false;
+    ULONG gatewayMetric = 0;
+};
+
 // 无法枚举时返回 true，交给 bind 判断。
 template <typename Match>
 bool AnyPreferred(Match match) {
@@ -53,11 +74,22 @@ bool LocalAddressReady(const std::wstring& address) {
     return AnyPreferred([&](const IN_ADDR& local) { return local.s_addr == wanted.s_addr; });
 }
 
-std::vector<std::wstring> LocalIPv4Addresses() {
+std::wstring SourceIPv4Address(const std::wstring& peer) {
+    SOCKADDR_INET destination{};
+    destination.Ipv4.sin_family = AF_INET;
+    if (InetPtonW(AF_INET, peer.c_str(), &destination.Ipv4.sin_addr) != 1 ||
+        destination.Ipv4.sin_addr.s_addr == INADDR_ANY) return {};
+    ULONG interfaceIndex = 0;
+    if (GetBestInterfaceEx(reinterpret_cast<sockaddr*>(&destination.Ipv4), &interfaceIndex) != NO_ERROR) return {};
+    return RouteSource(destination, interfaceIndex);
+}
+
+std::wstring PreferredLanIPv4Address() {
     ULONG size = 16384;
     std::vector<uint8_t> buffer;
     ULONG status = ERROR_BUFFER_OVERFLOW;
-    constexpr ULONG flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER;
+    constexpr ULONG flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST |
+                            GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_INCLUDE_GATEWAYS;
     for (int attempt = 0; attempt < 3 && status == ERROR_BUFFER_OVERFLOW; ++attempt) {
         buffer.resize(size);
         status = GetAdaptersAddresses(AF_INET, flags, nullptr,
@@ -65,27 +97,39 @@ std::vector<std::wstring> LocalIPv4Addresses() {
     }
     if (status != NO_ERROR) return {};
 
-    std::vector<std::wstring> physical, other;
+    LanAddress physical, other;
     for (auto* adapter = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data()); adapter; adapter = adapter->Next) {
         if (adapter->OperStatus != IfOperStatusUp || adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK) continue;
         MIB_IF_ROW2 row{};
         row.InterfaceLuid = adapter->Luid;
         const bool hardware = GetIfEntry2(&row) == NO_ERROR && row.InterfaceAndOperStatusFlags.HardwareInterface;
-        auto& addresses = hardware ? physical : other;
+        auto& candidate = hardware ? physical : other;
         for (auto* entry = adapter->FirstUnicastAddress; entry; entry = entry->Next) {
             const auto* socketAddress = entry->Address.lpSockaddr;
             if (!socketAddress || socketAddress->sa_family != AF_INET || entry->DadState != IpDadStatePreferred) continue;
             const auto& ip = reinterpret_cast<const sockaddr_in*>(socketAddress)->sin_addr;
-            if (ip.s_addr == INADDR_ANY || ip.S_un.S_un_b.s_b1 == 127) continue;
-            wchar_t address[INET_ADDRSTRLEN]{};
-            if (InetNtopW(AF_INET, &ip, address, INET_ADDRSTRLEN) &&
-                std::find(addresses.begin(), addresses.end(), address) == addresses.end()) addresses.emplace_back(address);
+            if (ip.S_un.S_un_b.s_b1 == 127) continue;
+            const auto address = IPv4Text(ip);
+            if (address.empty()) continue;
+            if (candidate.first.empty()) candidate.first = address;
+            else if (candidate.first != address) candidate.multiple = true;
+        }
+        if (!candidate.gatewaySource.empty() && adapter->Ipv4Metric >= candidate.gatewayMetric) continue;
+        for (auto* gateway = adapter->FirstGatewayAddress; gateway; gateway = gateway->Next) {
+            const auto* address = gateway->Address.lpSockaddr;
+            if (!address || address->sa_family != AF_INET) continue;
+            SOCKADDR_INET destination{};
+            destination.Ipv4 = *reinterpret_cast<const sockaddr_in*>(address);
+            auto source = RouteSource(destination, adapter->IfIndex);
+            if (source.empty()) continue;
+            candidate.gatewaySource = std::move(source);
+            candidate.gatewayMetric = adapter->Ipv4Metric;
+            break;
         }
     }
-    for (auto& address : other) {
-        if (std::find(physical.begin(), physical.end(), address) == physical.end()) physical.push_back(std::move(address));
-    }
-    return physical;
+    const auto& preferred = physical.first.empty() && physical.gatewaySource.empty() ? other : physical;
+    if (!preferred.gatewaySource.empty()) return preferred.gatewaySource;
+    return preferred.multiple ? L"" : preferred.first;
 }
 
 bool AddressWatch::Lost() {

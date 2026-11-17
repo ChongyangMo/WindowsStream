@@ -10,6 +10,7 @@ public:
     bool Authenticate(const std::string& token, int width, int height, int fps);
     bool Read(uint8_t& type, std::vector<uint8_t>& payload);
     bool Send(uint8_t type, const Writer& payload);
+    std::wstring LocalAddress() const;
     void Shutdown();
     static void CloseListener();
 private:
