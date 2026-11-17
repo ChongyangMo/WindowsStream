@@ -1,4 +1,5 @@
 #include "tray.h"
+#include "network_setup.h"
 #include "workspace/catalog.h"
 #include "../../shared/app_icon.h"
 
@@ -44,6 +45,7 @@ void ControllerTray::Menu() {
     HMENU menu = CreatePopupMenu();
     if (!menu) return;
     AppendMenuW(menu, MF_STRING, kControllerTrayShow, L"显示窗口");
+    network_setup::AddTrayMenu(menu);
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, kControllerTrayExit, L"退出");
     SetMenuDefaultItem(menu, kControllerTrayShow, FALSE);
@@ -82,6 +84,7 @@ bool ControllerTray::Handle(UINT message, WPARAM wParam, LPARAM lParam) {
             return true;
         }
         case WM_COMMAND:
+            if (network_setup::HandleTrayCommand(window_, LOWORD(wParam))) return true;
             if (LOWORD(wParam) == kControllerTrayShow) { Show(); return true; }
             if (LOWORD(wParam) == kControllerTrayExit) {
                 LogLine("用户从托盘主动退出控制端");

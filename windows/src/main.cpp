@@ -15,6 +15,7 @@
 #include "diagnostics/freeze_trace.h"
 #include "diagnostics/window_fit.h"
 #include "runtime/tray.h"
+#include "runtime/network_setup.h"
 #include "runtime/profile.h"
 #include "runtime/workspace.h"
 #include "../shared/app_icon.h"
@@ -928,6 +929,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
+    const int setupResult = network_setup::Dispatch();
+    if (setupResult >= 0) return setupResult;
     const int guardResult = proxy::RunProxyGuard();
     if (guardResult >= 0) return guardResult;
     const int workspaceResult = RunControllerWorkspace(instance, show, g_startup);

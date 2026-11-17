@@ -86,7 +86,7 @@ bool Connection::AcceptReverse(const std::wstring& bindHost, uint16_t port, cons
     }
     if (net::AutoBind(bindHost)) {
         // 自动模式下网线链路或 169.254 地址缺失时被控端的包无法到达，状态变化时提示一次。
-        // 链路断开（对端断电、睡眠、扩展坞失电）与本机缺地址分开，避免误导去重跑 setup-link。
+        // 分开提示链路断开（对端断电、睡眠、扩展坞失电）和本机缺地址。
         static ULONGLONG nextCheck = 0;
         static int linkState = -1, lastSeen = -1;
         if (GetTickCount64() >= nextCheck) {
@@ -98,7 +98,7 @@ bool Connection::AcceptReverse(const std::wstring& bindHost, uint16_t port, cons
             if (stable && state != linkState) {
                 static const char* const text[] = {
                     "本机有线网卡没有链路：被控端可能已断电、睡眠，或网线/扩展坞未供电；链路恢复后被控端会自动连入",
-                    "网线已接通但本机没有 169.254 链路地址，被控端无法连入，请运行 setup-link.cmd",
+                    "网线已接通但本机没有 169.254 链路地址，请在控制端托盘菜单选择「网络配置 > 配置网线直连」",
                     "本机已有 169.254 链路地址，被控端可以通过网线连入"};
                 uint64_t mbps = 0;
                 if (state == 2 && net::WiredLinkUp(&mbps) && mbps) LogLine("%s，链路 %llu Mbps", text[state], mbps);

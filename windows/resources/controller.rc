@@ -1,3 +1,4 @@
 #include "resource.h"
 
 IDI_WINDOWSSTREAM ICON "controller.ico"
+IDR_NETWORK_SETUP RCDATA "network-setup.ps1"
