@@ -1,4 +1,5 @@
 #include "net.h"
+#include "diagnostics/freeze_trace.h"
 #include "../shared/crypto.h"
 #include "../shared/net_health.h"
 
@@ -227,6 +228,7 @@ bool Connection::ReadExact(void* buffer, size_t size) {
     while (size > 0) {
         int n = recv(socket_, p, static_cast<int>(std::min<size_t>(size, 1 << 20)), 0);
         if (n <= 0) {
+            ControllerTrace().Event("套接字读结束（错误码/待收字节）", n ? WSAGetLastError() : 0, size);
             return false;
         }
         p += n;
@@ -266,6 +268,7 @@ bool Connection::Send(uint8_t type, const void* data, size_t size) {
     while (remaining > 0) {
         int n = send(socket_, p, static_cast<int>(remaining), 0);
         if (n <= 0) {
+            ControllerTrace().Event("套接字发送失败（类型/错误码/待发字节）", type, n ? WSAGetLastError() : 0, remaining);
             return false;
         }
         p += n;

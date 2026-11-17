@@ -1,4 +1,5 @@
 #include "video.h"
+#include "diagnostics/freeze_trace.h"
 
 #include <codecapi.h>
 #include <d3dcompiler.h>
@@ -278,6 +279,7 @@ void VideoPipeline::Submit(EncodedFrame&& frame) {
         Item item;
         item.frame = std::move(frame);
         queue_.push_back(std::move(item));
+        ControllerTrace().videoQueue = queue_.size();
         std::lock_guard statsLock(statsMutex_);
         stats_.maxQueue = std::max(stats_.maxQueue, static_cast<uint32_t>(queue_.size()));
     }
@@ -291,6 +293,7 @@ void VideoPipeline::SubmitLossless(std::vector<uint8_t>&& payload) {
         item.lossless = true;
         item.payload = std::move(payload);
         queue_.push_back(std::move(item));
+        ControllerTrace().videoQueue = queue_.size();
     }
     wake_.notify_one();
 }
@@ -327,6 +330,7 @@ VideoStats VideoPipeline::TakeStats() {
 }
 
 void VideoPipeline::Run() {
+    auto& trace = ControllerTrace();
     CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     ClearBackground();
     for (;;) {
@@ -339,14 +343,17 @@ void VideoPipeline::Run() {
             });
             if (!running_) break;
             items.swap(queue_);
+            trace.videoQueue = 0;
             resize = std::exchange(resizePending_, false);
             redraw = std::exchange(redrawPending_, false);
             resetOverlay = std::exchange(overlayResetPending_, false);
         }
         if (resetOverlay) {
+            const TraceActivity overlay(trace.videoWork, static_cast<uint16_t>(VideoWork::Overlay));
             ResetOverlayState(0, 0, 0);
         }
         if (resize) {
+            const TraceActivity resizing(trace.videoWork, static_cast<uint16_t>(VideoWork::Resize));
             ResizeSwapChain();
         }
 
@@ -360,10 +367,12 @@ void VideoPipeline::Run() {
         uint64_t decodeStart = NowMicros();
         for (auto& item : items) {
             if (item.lossless) {
+                const TraceActivity overlay(trace.videoWork, static_cast<uint16_t>(VideoWork::Overlay));
                 ApplyLossless(item.payload);
                 overlayChanged = true;
                 continue;
             }
+            const TraceActivity decoding(trace.videoWork, static_cast<uint16_t>(VideoWork::Decode));
             ApplyDirty(item.frame);
             if (item.frame.enqueueMicros && decodeStart >= item.frame.enqueueMicros) {
                 queueMicros += decodeStart - item.frame.enqueueMicros;
@@ -371,6 +380,7 @@ void VideoPipeline::Run() {
             }
             if (!Decode(item.frame, latest)) {
                 ++decodeErrors;
+                ++trace.decodeErrors;
                 if (onDecodeError) onDecodeError();
             }
             newest = &item.frame;
@@ -485,6 +495,11 @@ bool VideoPipeline::DrainOutput(ComPtr<IMFSample>& latest) {
             return false;
         }
         latest.Attach(output.pSample);
+        if (latest) {
+            auto& trace = ControllerTrace();
+            trace.lastDecode = GetTickCount64();
+            ++trace.decoded;
+        }
         std::lock_guard lock(statsMutex_);
         stats_.decoded++;
     }
@@ -759,6 +774,8 @@ bool VideoPipeline::EnsureProcessor(UINT width, UINT height) {
 }
 
 bool VideoPipeline::Render(IMFSample* sample) {
+    auto& trace = ControllerTrace();
+    const TraceActivity rendering(trace.videoWork, static_cast<uint16_t>(VideoWork::Render));
     ComPtr<IMFMediaBuffer> buffer;
     ComPtr<IMFDXGIBuffer> dxgiBuffer;
     ComPtr<ID3D11Texture2D> texture;
@@ -802,11 +819,17 @@ bool VideoPipeline::Render(IMFSample* sample) {
         return false;
     }
     DrawOverlay(fit, frameW, frameH);
+    const TraceActivity presenting(trace.videoWork, static_cast<uint16_t>(VideoWork::Present));
     const auto result = swapChain_->Present(0, tearing_ ? DXGI_PRESENT_ALLOW_TEARING : 0);
-    return SUCCEEDED(result) && result != DXGI_STATUS_OCCLUDED;
+    trace.presentResult = result;
+    if (FAILED(result) || result == DXGI_STATUS_OCCLUDED) return false;
+    trace.lastPresent = GetTickCount64();
+    ++trace.presented;
+    return true;
 }
 
 void VideoPipeline::ClearBackground() {
+    const TraceActivity clearing(ControllerTrace().videoWork, static_cast<uint16_t>(VideoWork::Clear));
     ComPtr<ID3D11Texture2D> backBuffer;
     if (FAILED(swapChain_->GetBuffer(0, IID_PPV_ARGS(&backBuffer)))) return;
     ComPtr<ID3D11RenderTargetView> target;

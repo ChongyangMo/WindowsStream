@@ -40,6 +40,7 @@
     <ClCompile Include="..\shared\update_package.cpp" />
     <ClCompile Include="..\src\common.cpp" />
     <ClCompile Include="..\src\diagnostics\metrics.cpp" />
+    <ClCompile Include="..\src\diagnostics\freeze_trace.cpp" />
     <ClCompile Include="..\src\diagnostics\window_fit.cpp" />
     <ClCompile Include="..\src\discovery.cpp" />
     <ClCompile Include="..\src\locate\responder.cpp" />
@@ -88,6 +89,7 @@
     <ClInclude Include="..\shared\update_package.h" />
     <ClInclude Include="..\src\common.h" />
     <ClInclude Include="..\src\diagnostics\metrics.h" />
+    <ClInclude Include="..\src\diagnostics\freeze_trace.h" />
     <ClInclude Include="..\src\diagnostics\window_fit.h" />
     <ClInclude Include="..\src\discovery.h" />
     <ClInclude Include="..\src\keymap.h" />

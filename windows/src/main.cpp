@@ -11,6 +11,7 @@
 #include "proxy/access.h"
 #include "proxy/network_menu.h"
 #include "diagnostics/metrics.h"
+#include "diagnostics/freeze_trace.h"
 #include "diagnostics/window_fit.h"
 #include "runtime/tray.h"
 #include "runtime/profile.h"
@@ -130,9 +131,11 @@ std::shared_ptr<Connection> CurrentConnection() {
 bool Connected() { return CurrentConnection() != nullptr; }
 
 void SendToHost(uint8_t type, const Writer& writer) {
-    if (auto connection = CurrentConnection()) {
-        connection->Send(type, writer.bytes.data(), writer.bytes.size());
-    }
+    auto& trace = ControllerTrace();
+    const TraceActivity sending(trace.sendWork, type);
+    const auto connection = CurrentConnection();
+    const bool ok = connection && connection->Send(type, writer.bytes.data(), writer.bytes.size());
+    trace.Sent(type, ok, static_cast<bool>(connection));
 }
 
 void PostStatus(const std::wstring& text) {
@@ -297,9 +300,11 @@ void HandlePong(const std::vector<uint8_t>& payload) {
     g_video.clockOffsetMicros = best.second;
     g_video.clockOffsetValid = true;
     g_rttMicros = rtt;
+    ControllerTrace().rttMicros = rtt;
 }
 
 void NetworkLoop() {
+    auto& trace = ControllerTrace();
     while (g_running) {
         auto candidates = ConnectionCandidates();
         if (candidates.empty()) {
@@ -331,6 +336,7 @@ void NetworkLoop() {
             PostStatus(_wcsicmp(candidate.host.c_str(), L"listen") == 0 ? L"等待被控端连接" : L"正在连接");
             auto attempt = std::make_shared<Connection>();
             const bool reverse = _wcsicmp(candidate.host.c_str(), L"listen") == 0;
+            const TraceActivity connecting(trace.networkWork, 1);
             const bool success = reverse
                 ? attempt->AcceptReverse(g_settings.bindHost, candidate.port, g_settings.token, display, info, error)
                 : attempt->Connect(candidate.host, candidate.port, g_settings.token, display, info, error);
@@ -354,6 +360,10 @@ void NetworkLoop() {
             g_connectedHost = host;
         }
         LogLine("已连接 %s，%dx%d @ %d fps", WideToUtf8(host).c_str(), info.width, info.height, info.fps);
+        ++trace.session;
+        trace.lastPacket = trace.lastVideo = trace.lastPong = trace.lastTelemetry = 0;
+        trace.rttMicros = -1;
+        trace.Event("连接建立（宽/高/帧率上限）", info.width, info.height, info.fps);
         g_clockSamples.clear(); g_rttMicros = -1; g_video.clockOffsetValid = false;
         g_video.TakeStats();
         g_diagnostics.Begin(info.width, info.height, info.fps);
@@ -376,7 +386,13 @@ void NetworkLoop() {
 
         uint8_t type = 0;
         std::vector<uint8_t> payload;
-        while (g_running && connection->Read(type, payload)) {
+        while (g_running) {
+            {
+                const TraceActivity receiving(trace.networkWork, 2);
+                if (!connection->Read(type, payload)) break;
+            }
+            const TraceActivity dispatching(trace.networkWork, 3);
+            trace.Receive(type);
             g_bytesReceived += payload.size() + 5;
             g_diagnostics.Received(payload.size() + 5, type == MsgVideo);
             switch (type) {
@@ -429,6 +445,7 @@ void NetworkLoop() {
                 case MsgHostInfo:
                     if (payload.size() <= 4096) {
                         const std::string text(payload.begin(), payload.end());
+                        if (text.starts_with("系统未接受键鼠操作")) trace.Event("被控端报告键鼠注入失败");
                         LogLine("被控端：%s", text.c_str());
                     }
                     break;
@@ -436,8 +453,10 @@ void NetworkLoop() {
                     g_diagnostics.Remote(payload);
                     break;
                 case MsgExclusiveMouseState:
-                    if (payload.size() == 5 && payload[0] <= static_cast<uint8_t>(ExclusiveMouseState::Failed))
+                    if (payload.size() == 5 && payload[0] <= static_cast<uint8_t>(ExclusiveMouseState::Failed)) {
+                        trace.Event("独占鼠标状态（状态/错误码）", payload[0], ReadU32(payload.data() + 1));
                         PostMessageW(g_window, WM_APP_EXCLUSIVE_MOUSE_STATE, payload[0], ReadU32(payload.data() + 1));
+                    }
                     break;
                 case MsgClipboard: {
                     auto* text = new std::wstring(Utf8ToWide(std::string(payload.begin(), payload.end())));
@@ -459,6 +478,7 @@ void NetworkLoop() {
         }
         g_video.clockOffsetValid = false;
         g_diagnostics.End();
+        trace.Event("连接断开（退出）", !g_running);
         LogLine("连接断开");
         if (g_running) {
             PostStatus(L"连接已断开，正在重连…");
@@ -496,7 +516,8 @@ void SendKey(int remoteKey, bool down) {
 
 void SendButton(int button, bool down, LPARAM lParam) {
     uint16_t x = g_lastX, y = g_lastY;
-    MapPoint(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), x, y);
+    const bool mapped = MapPoint(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), x, y);
+    ControllerTrace().Event("收到鼠标按键（按钮/按下/定位有效）", button, down, mapped);
     g_lastX = x;
     g_lastY = y;
     if (down) {
@@ -645,6 +666,8 @@ void UpdateTitle() {
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+    auto& trace = ControllerTrace();
+    const TraceActivity dispatching(trace.uiWork, static_cast<uint16_t>(message));
     if (message == WM_CLOSE) ReleaseAllRemote();
     if (g_controllerTray.Handle(message, wParam, lParam)) return 0;
     if (g_networkAccess.Handle(message, wParam)) return 0;
@@ -652,6 +675,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
         case network_menu::kQuery:
             return g_networkAccess.MenuState();
         case WM_SIZE:
+            trace.Event("窗口尺寸（宽/高/类型）", LOWORD(lParam), HIWORD(lParam), wParam);
             FitStreamWindow(hwnd, g_streamWidth, g_streamHeight);
             g_video.RequestResize();
             SetTimer(hwnd, kViewSizeTimer, 250, nullptr);
@@ -680,6 +704,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
             break;
 
         case WM_MOUSEMOVE: {
+            ++trace.mouseMoves;
             if (g_fileDrag.Dragging()) return 0;
             uint16_t x, y;
             if (Connected() && MapPoint(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), x, y) && (x != g_lastX || y != g_lastY)) {
@@ -695,9 +720,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
         }
         case WM_LBUTTONDOWN:
             if (!g_fileDrag.Dragging()) { g_fileDrag.Press(); SendButton(0, true, lParam); }
+            else trace.Event("鼠标左键按下未转发（正在本地文件拖拽）");
             return 0;
         case WM_LBUTTONUP:
             if (!g_fileDrag.Dragging()) { g_fileDrag.Cancel(); SendButton(0, false, lParam); }
+            else trace.Event("鼠标左键松开未转发（正在本地文件拖拽）");
             return 0;
         case WM_RBUTTONDOWN: SendButton(1, true, lParam); return 0;
         case WM_RBUTTONUP: SendButton(1, false, lParam); return 0;
@@ -766,10 +793,15 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
             g_video.RequestRedraw();
             LogLine("无损层显示：%s", g_video.overlayEnabled ? "开" : "关");
             return 0;
+        case WM_SETFOCUS:
+            trace.Event("窗口获得焦点");
+            break;
         case WM_KILLFOCUS:
+            trace.Event("窗口失去焦点（按住的鼠标键掩码）", g_buttonsDown);
             ReleaseAllRemote();
             return 0;
         case WM_CAPTURECHANGED:
+            trace.Event("鼠标捕获变化（按住的鼠标键掩码）", g_buttonsDown);
             if (g_buttonsDown) ReleaseAllRemote();
             return 0;
         case filedrag::kOfferReady:
@@ -856,6 +888,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
                 return 0;
             }
             if (wParam == kTimer) {
+                trace.lastUiTimer = GetTickCount64();
                 g_networkAccess.Tick(Connected());
                 Writer w;
                 w.u64(NowMicros());
@@ -964,6 +997,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
                                monitorInfo.rcWork.left + (workW - windowW) / 2, monitorInfo.rcWork.top + (workH - windowH) / 2,
                                windowW, windowH, hosted ? g_startup.workspace : nullptr, nullptr, instance, nullptr);
     if (!g_window) return 1;
+    ControllerTrace().Start(g_window);
     if (g_startup.primary) g_networkAccess.Start(g_window, ConfigPath(), proxyServer);
     ImmAssociateContextEx(g_window, nullptr, 0);  // 关闭输入法，按键原样发给 Windows
 
@@ -1024,5 +1058,6 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     WSACleanup();
     if (SUCCEEDED(ole)) OleUninitialize();
     if (singleInstance) CloseHandle(singleInstance);
+    ControllerTrace().Stop();
     return 0;
 }
