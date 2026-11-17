@@ -31,6 +31,7 @@ try {
         $profile = Join-Path $folder 'client.ini'
         $bridge = Join-Path $folder 'WindowsStreamBridge.exe'
         $relay = Join-Path $folder 'relay.ini'
+        $instance = 'relay-' + $pair.device.Substring(0, 32)
         $port = (Read-RelaySection $profile 'connection').port
         if ($port -notmatch '^18\d{3}$') { $port = $null }
         if (!$port) {
@@ -69,7 +70,7 @@ token=$($pair.viewer_key)
             Write-RelayIni $profile @"
 [connection]
 name=$($pair.name)（中转）
-instance=relay-$($pair.device)
+instance=$instance
 host=127.0.0.1
 port=$port
 token=$($pair.stream_key)
