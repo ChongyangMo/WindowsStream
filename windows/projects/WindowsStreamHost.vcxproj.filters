@@ -16,6 +16,7 @@
   <ItemGroup>
     <ClCompile Include="..\host\file_drag\drop_target.cpp"><Filter>host\file_drag</Filter></ClCompile>
     <ClCompile Include="..\host\file_drag\sender.cpp"><Filter>host\file_drag</Filter></ClCompile>
+    <ClCompile Include="..\host\file_drag\receiver.cpp"><Filter>host\file_drag</Filter></ClCompile>
     <ClCompile Include="..\host\capture_diag.cpp"><Filter>host</Filter></ClCompile>
     <ClCompile Include="..\host\capture_gpu.cpp"><Filter>host</Filter></ClCompile>
     <ClCompile Include="..\host\capture.cpp"><Filter>host</Filter></ClCompile>
@@ -63,8 +64,10 @@
     <ClCompile Include="..\shared\update_package.cpp"><Filter>shared</Filter></ClCompile>
     <ClCompile Include="..\src\common.cpp"><Filter>src</Filter></ClCompile>
     <ClInclude Include="..\shared\file_drag.h"><Filter>shared</Filter></ClInclude>
+    <ClInclude Include="..\shared\file_drag_source.h"><Filter>shared</Filter></ClInclude>
     <ClInclude Include="..\host\file_drag\capture.h"><Filter>host\file_drag</Filter></ClInclude>
     <ClInclude Include="..\host\file_drag\sender.h"><Filter>host\file_drag</Filter></ClInclude>
+    <ClInclude Include="..\host\file_drag\receiver.h"><Filter>host\file_drag</Filter></ClInclude>
     <ClInclude Include="..\host\capture_diag.h"><Filter>host</Filter></ClInclude>
     <ClInclude Include="..\host\capture_gpu.h"><Filter>host</Filter></ClInclude>
     <ClInclude Include="..\host\capture.h"><Filter>host</Filter></ClInclude>

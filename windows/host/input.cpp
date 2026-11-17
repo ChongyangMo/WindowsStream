@@ -25,16 +25,20 @@ bool InputInjector::Submit(INPUT* inputs, UINT count) {
     return false;
 }
 
+POINT PrimaryInputPoint(uint16_t x, uint16_t y) {
+    return {static_cast<LONG>(static_cast<int64_t>(x) * (GetSystemMetrics(SM_CXSCREEN) - 1) / 65535),
+            static_cast<LONG>(static_cast<int64_t>(y) * (GetSystemMetrics(SM_CYSCREEN) - 1) / 65535)};
+}
+
 namespace {
 bool MousePosition(uint16_t x, uint16_t y, INPUT& input) {
     const int virtualWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN);
     const int virtualHeight = GetSystemMetrics(SM_CYVIRTUALSCREEN);
     if (virtualWidth < 2 || virtualHeight < 2) return false;
-    const int px = static_cast<int>(static_cast<int64_t>(x) * (GetSystemMetrics(SM_CXSCREEN) - 1) / 65535);
-    const int py = static_cast<int>(static_cast<int64_t>(y) * (GetSystemMetrics(SM_CYSCREEN) - 1) / 65535);
+    const auto point = PrimaryInputPoint(x, y);
     input.type = INPUT_MOUSE;
-    input.mi.dx = static_cast<LONG>(static_cast<int64_t>(px - GetSystemMetrics(SM_XVIRTUALSCREEN)) * 65535 / (virtualWidth - 1));
-    input.mi.dy = static_cast<LONG>(static_cast<int64_t>(py - GetSystemMetrics(SM_YVIRTUALSCREEN)) * 65535 / (virtualHeight - 1));
+    input.mi.dx = static_cast<LONG>(static_cast<int64_t>(point.x - GetSystemMetrics(SM_XVIRTUALSCREEN)) * 65535 / (virtualWidth - 1));
+    input.mi.dy = static_cast<LONG>(static_cast<int64_t>(point.y - GetSystemMetrics(SM_YVIRTUALSCREEN)) * 65535 / (virtualHeight - 1));
     input.mi.dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK;
     return true;
 }

@@ -5,6 +5,8 @@
 #include <utility>
 #include "service/service.h"
 
+POINT PrimaryInputPoint(uint16_t x, uint16_t y);
+
 class InputInjector {
 public:
     ~InputInjector();

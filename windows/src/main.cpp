@@ -4,6 +4,7 @@
 #include "net.h"
 #include "video.h"
 #include "file_drag/gesture.h"
+#include "file_drag/upload.h"
 #include "runtime/relay.h"
 #include "updates/server.h"
 #include "proxy/server.h"
@@ -57,6 +58,7 @@ std::wstring g_connectedHost;  // 当前连接目标
 bool AutoHost() { return g_settings.host.empty() || _wcsicmp(g_settings.host.c_str(), L"auto") == 0; }
 VideoPipeline g_video;
 filedrag::Gesture g_fileDrag;
+filedrag::Upload g_fileUpload;
 StreamDiagnostics g_diagnostics;
 std::deque<std::pair<int64_t, int64_t>> g_clockSamples;
 std::mutex g_connectionMutex;
@@ -381,6 +383,7 @@ void NetworkLoop() {
             g_connection = connection;
         }
         g_fileDrag.Connect(g_window, connection);
+        g_fileUpload.Connect(connection);
         PostStatus(L"");
         connection->Send(MsgRequestKeyframe);
 
@@ -466,11 +469,13 @@ void NetworkLoop() {
                     break;
                 }
                 default:
-                    g_fileDrag.Receive(type, payload);
+                    if (!g_fileUpload.Receive(type, payload)) g_fileDrag.Receive(type, payload);
                     break;
             }
         }
         g_fileDrag.Disconnect();
+        connection->Shutdown();
+        g_fileUpload.Disconnect();
         PostMessageW(g_window, WM_APP_EXCLUSIVE_MOUSE_STATE, 0, 0);
         {
             std::lock_guard lock(g_connectionMutex);
@@ -662,6 +667,7 @@ void UpdateTitle() {
     std::wstring title = g_profile.title;
     if (!g_status.empty()) title += L" · " + g_status;
     else if (Connected()) title += L" · " + g_diagnostics.Title();
+    if (const auto* upload = g_fileUpload.Status(); *upload) title += std::wstring(L" · ") + upload;
     SetWindowTextW(g_window, title.c_str());
 }
 
@@ -810,6 +816,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
                 g_fileDrag.Drop(hwnd, offer);
             }
             return 0;
+        case filedrag::kUploadChanged:
+            UpdateTitle();
+            return 0;
 
         case WM_CLIPBOARDUPDATE:
             OnLocalClipboardChanged();
@@ -905,6 +914,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
             return 0;
 
         case WM_DESTROY:
+            g_fileUpload.Revoke();
             RemovePropW(hwnd, kExclusiveMouseStateProperty);
             g_networkAccess.Stop();
             g_running = false;
@@ -1015,6 +1025,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     };
 
     if (g_startup.primary) g_controllerTray.Start(g_window);
+    if (SUCCEEDED(ole)) g_fileUpload.Register(g_window);
     AddClipboardFormatListener(g_window);
     g_keyboardHook = SetWindowsHookExW(WH_KEYBOARD_LL, KeyboardHook, instance, 0);
     SetTimer(g_window, kTimer, 500, nullptr);
@@ -1050,6 +1061,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     g_networkAccess.Stop();
     if (auto connection = CurrentConnection()) connection->Shutdown();
     if (g_networkThread.joinable()) g_networkThread.join();
+    g_fileUpload.Stop();
     Connection::CloseReverseListener();
     g_video.Shutdown();
     updateServer.Stop();

@@ -20,6 +20,7 @@
     <ClCompile Include="..\src\file_drag\drop.cpp"><Filter>src\file_drag</Filter></ClCompile>
     <ClCompile Include="..\src\file_drag\stream.cpp"><Filter>src\file_drag</Filter></ClCompile>
     <ClCompile Include="..\src\file_drag\transfer.cpp"><Filter>src\file_drag</Filter></ClCompile>
+    <ClCompile Include="..\src\file_drag\upload.cpp"><Filter>src\file_drag</Filter></ClCompile>
     <ClCompile Include="..\shared\crypto.cpp"><Filter>shared</Filter></ClCompile>
     <ClCompile Include="..\shared\locate.cpp"><Filter>shared</Filter></ClCompile>
     <ClCompile Include="..\shared\net_health.cpp"><Filter>shared</Filter></ClCompile>
@@ -61,10 +62,12 @@
     <ClCompile Include="..\src\updates\server.cpp"><Filter>src\updates</Filter></ClCompile>
     <ClCompile Include="..\src\video.cpp"><Filter>src</Filter></ClCompile>
     <ClInclude Include="..\shared\file_drag.h"><Filter>shared</Filter></ClInclude>
+    <ClInclude Include="..\shared\file_drag_source.h"><Filter>shared</Filter></ClInclude>
     <ClInclude Include="..\src\file_drag\gesture.h"><Filter>src\file_drag</Filter></ClInclude>
     <ClInclude Include="..\src\file_drag\drop.h"><Filter>src\file_drag</Filter></ClInclude>
     <ClInclude Include="..\src\file_drag\stream.h"><Filter>src\file_drag</Filter></ClInclude>
     <ClInclude Include="..\src\file_drag\transfer.h"><Filter>src\file_drag</Filter></ClInclude>
+    <ClInclude Include="..\src\file_drag\upload.h"><Filter>src\file_drag</Filter></ClInclude>
     <ClInclude Include="..\shared\app_icon.h"><Filter>shared</Filter></ClInclude>
     <ClInclude Include="..\shared\crypto.h"><Filter>shared</Filter></ClInclude>
     <ClInclude Include="..\shared\host_control.h"><Filter>shared</Filter></ClInclude>

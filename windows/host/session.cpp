@@ -4,6 +4,7 @@
 #include "cursor.h"
 #include "exclusive_mouse.h"
 #include "input.h"
+#include "input_diagnostics.h"
 #include "discovery.h"
 #include "file_drag/sender.h"
 #include "file_drag/receiver.h"
@@ -46,7 +47,15 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
     std::atomic<bool> forceKeyframe{true};
     std::thread receiver([&] {
         InputInjector input;
+        InputDiagnostics inputDiagnostics;
         ExclusiveMouse exclusiveMouse;
+        const auto report = [&](const std::string& message) {
+            if (message.empty()) return;
+            LogLine("%s", message.c_str());
+            Writer notice;
+            notice.append(message.data(), message.size());
+            if (!channel.Send(MsgHostInfo, notice)) connected = false;
+        };
         bool mouseWasExclusive = false;
         uint8_t type = 0;
         std::vector<uint8_t> payload;
@@ -96,14 +105,13 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
                     // 首版按被控端真实主屏和配置输出，不修改分辨率或创建虚拟屏。
                     break;
                 default:
-                    if (!fileReceiver.Handle(type, payload) && !fileDrag.Handle(type, payload, input)) input.Handle(type, payload);
-                    if (const auto error = input.TakeFailureNotice()) {
-                        const auto message = "系统未接受键鼠操作，错误码 " + std::to_string(*error);
-                        LogLine("%s", message.c_str());
-                        Writer notice;
-                        notice.append(message.data(), message.size());
-                        if (!channel.Send(MsgHostInfo, notice)) connected = false;
+                    if (!fileReceiver.Handle(type, payload) && !fileDrag.Handle(type, payload, input)) {
+                        const bool submitted = input.Handle(type, payload);
+                        if (type == MsgMouseButton && !servermode::SecureAgent())
+                            report(inputDiagnostics.MouseButton(payload, submitted, exclusiveMouse.Active()));
                     }
+                    if (const auto error = input.TakeFailureNotice())
+                        report("系统未接受键鼠操作，错误码 " + std::to_string(*error));
                     break;
             }
         }

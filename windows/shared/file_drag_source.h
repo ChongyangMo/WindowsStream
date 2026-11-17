@@ -2,6 +2,7 @@
 
 #include "file_drag.h"
 #include <memory>
+#include <ole2.h>
 #include <shellapi.h>
 
 namespace filedrag {

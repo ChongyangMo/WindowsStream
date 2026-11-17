@@ -31,6 +31,7 @@
     <ClCompile Include="..\src\file_drag\drop.cpp" />
     <ClCompile Include="..\src\file_drag\stream.cpp" />
     <ClCompile Include="..\src\file_drag\transfer.cpp" />
+    <ClCompile Include="..\src\file_drag\upload.cpp" />
     <ClCompile Include="..\shared\crypto.cpp" />
     <ClCompile Include="..\shared\locate.cpp" />
     <ClCompile Include="..\shared\net_health.cpp" />
@@ -75,10 +76,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\shared\file_drag.h" />
+    <ClInclude Include="..\shared\file_drag_source.h" />
     <ClInclude Include="..\src\file_drag\gesture.h" />
     <ClInclude Include="..\src\file_drag\drop.h" />
     <ClInclude Include="..\src\file_drag\stream.h" />
     <ClInclude Include="..\src\file_drag\transfer.h" />
+    <ClInclude Include="..\src\file_drag\upload.h" />
     <ClInclude Include="..\shared\app_icon.h" />
     <ClInclude Include="..\shared\crypto.h" />
     <ClInclude Include="..\shared\host_control.h" />

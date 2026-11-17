@@ -146,7 +146,7 @@ void Receiver::Write(const std::vector<uint8_t>& payload) {
         if (const auto error = batch.OpenPart()) { Finish(error); return; }
     }
     DWORD written = 0;
-    if (length && !WriteFile(batch.part.get(), payload.data() + kUploadDataHeader, length, &written, nullptr)) {
+    if (length && !::WriteFile(batch.part.get(), payload.data() + kUploadDataHeader, length, &written, nullptr)) {
         Finish(GetLastError());
         return;
     }
