@@ -16,6 +16,8 @@ public static class WindowsStreamTakeover
     private static extern int GetClassName(IntPtr window, StringBuilder name, int length);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool WritePrivateProfileString(string section, string key, string value, string file);
 
     public static void RequestExit(uint processId, bool host)
     {

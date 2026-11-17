@@ -15,7 +15,7 @@ $server = Join-Path $folder 'server'
 $viewer = Join-Path $folder 'controller'
 $hostFolder = Join-Path $folder 'host'
 $bridge = Join-Path $viewer 'WindowsStreamBridge.exe'
-$hostProgram = Join-Path $releaseRoot 'host/.runtime/WindowsStreamHost.exe'
+$hostProgram = Join-Path $releaseRoot 'host/WindowsStream-Host.exe'
 $serverConfig = Join-Path $server 'windowsstream-relay.ini'
 $endpoint = 'wss://sdserver.luxvisions-inno.com/api/windowsstream/relay'
 $target = '10.18.32.67:443'
@@ -123,15 +123,12 @@ enabled=0
 [updates]
 enabled=0
 "@ ([Text.Encoding]::Unicode)
-Copy-Item -LiteralPath $hostProgram, $bridge, (Join-Path $PSScriptRoot 'Start-WindowsStream.cmd') -Destination $hostFolder
-$launcher = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'start-host.ps1'), $utf8)
-[IO.File]::WriteAllText((Join-Path $hostFolder 'start-host.ps1'), $launcher, [Text.UTF8Encoding]::new($true))
+Copy-Item -LiteralPath $hostProgram -Destination $hostFolder
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Open-WindowsStream.cmd') -Destination $viewer
 $launcher = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'open-controller.ps1'), $utf8)
 [IO.File]::WriteAllText((Join-Path $viewer 'open-controller.ps1'), $launcher, [Text.UTF8Encoding]::new($true))
-foreach ($destination in @($hostFolder, $viewer)) {
-    $launcher = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'takeover.ps1'), $utf8)
-    [IO.File]::WriteAllText((Join-Path $destination 'takeover.ps1'), $launcher, [Text.UTF8Encoding]::new($true))
-}
-Compress-Archive -Path (Join-Path $hostFolder '*') -DestinationPath (Join-Path $folder "WindowsStream-$name-host.zip") -Force
+$launcher = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'takeover.ps1'), $utf8)
+[IO.File]::WriteAllText((Join-Path $viewer 'takeover.ps1'), $launcher, [Text.UTF8Encoding]::new($true))
+$hostFiles = foreach ($file in 'WindowsStream-Host.exe','host.ini','relay.ini') { Join-Path $hostFolder $file }
+Compress-Archive -LiteralPath $hostFiles -DestinationPath (Join-Path $folder "WindowsStream-$name-host.zip") -Force
 Write-Output ('已生成 WindowsStream 中转被控端包和控制端配置：' + $name)

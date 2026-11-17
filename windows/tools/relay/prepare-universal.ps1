@@ -53,10 +53,10 @@ function Copy-Launcher([string]$Name, [string]$Folder) {
 
 Copy-Item -LiteralPath $hostProgram -Destination $hostFolder -Force
 Copy-Item -LiteralPath $bridgeProgram -Destination (Join-Path $hostFolder 'WindowsStreamBridge.exe') -Force
-foreach ($launcher in @('takeover.ps1','pairing.ps1')) {
+$scripts = @('takeover.ps1','pairing.ps1','start-host.ps1','install-configured.ps1')
+foreach ($launcher in $scripts) {
     Copy-Launcher $launcher $hostFolder
 }
-Copy-Launcher 'start-host.ps1' $hostFolder
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'host.ini.template') -Destination $hostFolder -Force
 $network = Join-Path $controllerRuntime 'relay-network.ini'
 if (!(Test-Path -LiteralPath $network)) {
@@ -66,7 +66,7 @@ http_proxy=$ControllerProxy
 "@
 }
 
-$package = @('enrollment.ini','WindowsStreamHost.exe','WindowsStreamBridge.exe','host.ini.template','start-host.ps1','pairing.ps1','takeover.ps1')
+$package = @('enrollment.ini','WindowsStreamHost.exe','WindowsStreamBridge.exe','host.ini.template') + $scripts
 $files = foreach ($name in $package) { Join-Path $hostFolder $name }
 $payload = Join-Path $root 'host-payload.zip'
 Compress-Archive -LiteralPath $files -DestinationPath $payload -Force
@@ -75,14 +75,14 @@ $overlay = Join-Path $root 'host-package-overlay.json'
 $replacement = @{}
 $replacement[(Join-Path $goRoot 'cmd/host-package/payload.zip')] = $payload
 [IO.File]::WriteAllText($overlay, (@{Replace=$replacement} | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
-$standalone = Join-Path $hostOutput 'WindowsStream-RelayHost.exe'
+$standalone = Join-Path $hostOutput 'WindowsStream-Host.exe'
 Push-Location -LiteralPath $goRoot
 try {
     & $go build -buildvcs=false -trimpath -mod=readonly -tags hostpackage -ldflags '-H=windowsgui' -overlay $overlay -o $standalone ./cmd/host-package
-    if ($LASTEXITCODE -ne 0) { throw '通用被控端启动程序构建失败。' }
+    if ($LASTEXITCODE -ne 0) { throw '被控端启动程序构建失败。' }
 } finally { Pop-Location }
 foreach ($folder in @($controllerRuntime, (Join-Path $hostOutput '.runtime'))) {
     $runtime = Get-Item -LiteralPath $folder -Force -ErrorAction SilentlyContinue
     if ($runtime) { $runtime.Attributes = $runtime.Attributes -bor [IO.FileAttributes]::Hidden }
 }
-Write-Output '已生成通用被控端。'
+Write-Output '已生成统一版被控端。'

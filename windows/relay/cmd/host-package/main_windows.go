@@ -35,6 +35,10 @@ func launch() (string, error) {
 		return "", fmt.Errorf("无法读取被控端位置：%w", err)
 	}
 	source := filepath.Dir(executable)
+	configured, err := hasHostConfig(source)
+	if err != nil {
+		return "", err
+	}
 	appData, err := windows.KnownFolderPath(windows.FOLDERID_LocalAppData, windows.KF_FLAG_CREATE)
 	if err != nil {
 		return "", fmt.Errorf("无法读取本机应用数据目录：%w", err)
@@ -57,13 +61,32 @@ func launch() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("无法准备被控端程序：%w", err)
 	}
+	if configured {
+		return "", startHost(app, source)
+	}
 	if err := configureIdentity(root, source, app); err != nil {
 		return "", fmt.Errorf("无法准备本机配对：%w", err)
 	}
-	if err := startHost(app); err != nil {
+	if err := startHost(app, ""); err != nil {
 		return "", err
 	}
 	return exportPair(app, source, root)
+}
+
+func hasHostConfig(source string) (bool, error) {
+	for _, name := range []string{"host.ini", "relay.ini"} {
+		info, err := os.Stat(filepath.Join(source, name))
+		if err == nil {
+			if !info.Mode().IsRegular() {
+				return false, fmt.Errorf("%s 必须是配置文件", name)
+			}
+			return true, nil
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return false, fmt.Errorf("无法读取 %s：%w", name, err)
+		}
+	}
+	return false, nil
 }
 
 func acquireLaunchMutex() (windows.Handle, error) {
@@ -80,14 +103,17 @@ func acquireLaunchMutex() (windows.Handle, error) {
 	return handle, nil
 }
 
-func startHost(app string) error {
+func startHost(app, installTo string) error {
 	system, err := windows.GetSystemDirectory()
 	if err != nil {
 		return err
 	}
 	powershell := filepath.Join(system, "WindowsPowerShell", "v1.0", "powershell.exe")
-	command := exec.Command(powershell, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-		"-File", filepath.Join(app, "start-host.ps1"), "-Package")
+	args := []string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", filepath.Join(app, "start-host.ps1"), "-Package"}
+	if installTo != "" {
+		args = append(args, "-InstallTo", installTo)
+	}
+	command := exec.Command(powershell, args...)
 	command.Dir = app
 	command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: windows.CREATE_NO_WINDOW}
 	output, err := command.CombinedOutput()

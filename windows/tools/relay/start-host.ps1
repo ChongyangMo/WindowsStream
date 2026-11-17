@@ -1,19 +1,20 @@
-param([switch]$Package, [switch]$Background)
+param([switch]$Package, [switch]$Background, [string]$InstallTo)
 
 $ErrorActionPreference = 'Stop'
 if ($Package) { [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false) }
 try {
     . (Join-Path $PSScriptRoot 'takeover.ps1')
-    $hostProgram = Join-Path $PSScriptRoot 'WindowsStreamHost.exe'
-    $relayProgram = Join-Path $PSScriptRoot 'WindowsStreamBridge.exe'
-    Assert-StreamFiles @($hostProgram, $relayProgram)
+    . (Join-Path $PSScriptRoot 'pairing.ps1')
+    $folder = if ($InstallTo) { (Resolve-Path -LiteralPath $InstallTo).Path } else { $PSScriptRoot }
+    $hostProgram = Join-Path $folder 'WindowsStreamHost.exe'
+    $relayProgram = Join-Path $folder 'WindowsStreamBridge.exe'
+    $hostConfig = Join-Path $folder 'host.ini'
+    $relayConfig = Join-Path $folder 'relay.ini'
     Invoke-StreamLock 'Local\WindowsStreamHostUpdate' {
-        $pairing = Join-Path $PSScriptRoot 'pairing.ps1'
-        if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'enrollment.ini')) {
-            . $pairing
-            Initialize-RelayHost $PSScriptRoot
-        }
-        Assert-StreamFiles @((Join-Path $PSScriptRoot 'host.ini'), (Join-Path $PSScriptRoot 'relay.ini'))
+        if (!$InstallTo) { Initialize-RelayHost $folder }
+        Assert-StreamFiles @($hostConfig)
+        $relay = Test-Path -LiteralPath $relayConfig
+        if ($relay -and (Read-RelaySection $relayConfig 'relay').role -ne 'host') { throw '中转配置必须使用被控端角色。' }
         $old = @(foreach ($entry in Get-StreamProcesses 'WindowsStreamHost.exe') {
             if ($entry.Instance.CommandLine -match '\s--(?:server-\S+|apply-update|stop-user-host|relay-autostart)(?:\s|$)') {
                 $entry.Process.Dispose()
@@ -23,15 +24,29 @@ try {
             foreach ($entry in $old) { $entry.Process.Dispose() }
             return
         }
+        $bridges = @(foreach ($entry in $old) {
+            if ($entry.Instance.ExecutablePath) {
+                $bridge = Join-Path (Split-Path -Parent $entry.Instance.ExecutablePath) 'WindowsStreamBridge.exe'
+                if ((Get-BridgeIdentity $bridge) -like 'host/*') { $bridge }
+            }
+        })
+        if ($relay) { $bridges += $relayProgram }
         Stop-StreamProcesses $old 'host'
-        Stop-OldBridges $relayProgram
-        $options = @{ FilePath = $hostProgram; WorkingDirectory = $PSScriptRoot; PassThru = $true }
+        foreach ($bridge in ($bridges | Select-Object -Unique)) { Stop-OldBridges $bridge }
+        if ($InstallTo) {
+            . (Join-Path $PSScriptRoot 'install-configured.ps1')
+            Install-ConfiguredHost $PSScriptRoot $folder $relay
+        }
+        $required = @($hostProgram)
+        if ($relay) { $required += $relayProgram }
+        Assert-StreamFiles $required
+        $options = @{ FilePath = $hostProgram; WorkingDirectory = $folder; PassThru = $true }
         if ($Background) { $options.ArgumentList = '--background' }
         $started = Start-Process @options
         try {
             if (!$started.WaitForInputIdle(8000) -or $started.HasExited) { throw '新版 WindowsStream 被控端未能启动。' }
         } finally { $started.Dispose() }
-        Start-Process -FilePath $relayProgram -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
+        if ($relay) { Start-Process -FilePath $relayProgram -WorkingDirectory $folder -WindowStyle Hidden }
     }
 } catch {
     if ($Background) {
