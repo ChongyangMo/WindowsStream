@@ -26,8 +26,9 @@ public:
     HostTelemetry Telemetry() const;
     // 配置允许 GPU 采集却因安全桌面等临时原因退回 GDI；恢复后需重建视频链路。
     bool GpuFallback() const { return gpuWanted_ && !capture_.IsGpu(); }
-    // 已正常出过画面后采集中断（合盖、屏幕关闭、桌面或分辨率切换），属于采集源变化而不是编码器故障。
+    // 采集源失效（包括首帧之前），重新协商时保留编码策略。
     bool CaptureLost() const { return captureLost_; }
+    bool CapturePaused() const { return capturePaused_; }
 private:
     VideoEncoder::Sink Measure(const VideoEncoder::Sink& sink);
     DesktopCapture capture_;
@@ -36,7 +37,7 @@ private:
     std::unique_ptr<GpuSoftwareEncoder> gpuSoftware_;
     StreamMetrics metrics_;
     int fps_ = 0, requestedFps_ = 0;
-    bool gpuWanted_ = false, captured_ = false, captureLost_ = false;
+    bool gpuWanted_ = false, capturePaused_ = false, captureLost_ = false;
 };
 
 // 细粒度等待由系统定时器完成；不以忙等占用 CPU，也不依赖默认 15.6 ms 的线程睡眠粒度。

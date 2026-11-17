@@ -1,4 +1,5 @@
 #include "stream.h"
+#include "service/service.h"
 #include <mmsystem.h>
 #include <utility>
 
@@ -64,18 +65,19 @@ bool FrameStream::Capture(bool keyframe, bool& submitted, const VideoEncoder::Si
     if (hardware_ && !hardware_->CanAccept()) { ++metrics_.skipped; return true; }
     uint64_t timestamp = 0;
     const auto before = NowMicros();
-    if (capture_.IsGpu()) {
-        const auto result = capture_.ReadGpu(timestamp);
-        if (result == CaptureResult::Failed) { captureLost_ = captured_; return false; }
-        if (result == CaptureResult::Idle) {
-            if (!keyframe || !capture_.Gpu()->HasFrame()) return true;
-            timestamp = NowMicros();  // 关键帧请求可以重新编码真实缓存桌面，不周期性制造重复帧。
-        }
-    } else {
-        if (!capture_.Read()) { captureLost_ = captured_; return false; }
-        timestamp = NowMicros();
+    const auto result = capture_.IsGpu() ? capture_.ReadGpu(timestamp) : capture_.Read();
+    if (result == CaptureResult::Failed ||
+        (result == CaptureResult::Unavailable && servermode::SecureAgent() && !servermode::DesktopAccessible())) {
+        captureLost_ = true;
+        return false;
     }
-    captured_ = true;
+    if (result == CaptureResult::Unavailable) {
+        capturePaused_ = true;
+        return true;
+    }
+    keyframe = keyframe || capturePaused_;
+    if (result == CaptureResult::Idle && (!keyframe || !capture_.Gpu()->HasFrame())) return true;
+    if (!timestamp) timestamp = NowMicros(); // GDI 或关键帧请求复用最近一张真实桌面。
     metrics_.captureMicros += NowMicros() - before;
     ++metrics_.captured;
     const auto start = NowMicros();
@@ -91,7 +93,10 @@ bool FrameStream::Capture(bool keyframe, bool& submitted, const VideoEncoder::Si
         submitted = true;
     }
     metrics_.submitMicros += NowMicros() - start;
-    if (submitted) ++metrics_.submitted;
+    if (submitted) {
+        ++metrics_.submitted;
+        capturePaused_ = false;
+    }
     return true;
 }
 

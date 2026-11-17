@@ -8,7 +8,7 @@ class DesktopCapture {
 public:
     ~DesktopCapture();
     bool Initialize(int maxWidth, int maxHeight, bool gpu = true);
-    bool Read();
+    CaptureResult Read();
     CaptureResult ReadGpu(uint64_t& timestamp) { return gpu_->Read(timestamp); }
     bool IsGpu() const { return gpu_ != nullptr; }
     GpuCapture* Gpu() const { return gpu_.get(); }
@@ -21,6 +21,7 @@ public:
     const uint8_t* Pixels() const { return static_cast<const uint8_t*>(pixels_); }
 private:
     void Reset();
+    CaptureResult WaitForDesktop();
     std::unique_ptr<GpuCapture> gpu_;
     HDC screen_ = nullptr;
     HDC memory_ = nullptr;
@@ -30,4 +31,5 @@ private:
     int sourceWidth_ = 0, sourceHeight_ = 0;
     int width_ = 0, height_ = 0;
     int refreshHz_ = 0;
+    ULONGLONG retryAt_ = 0;
 };

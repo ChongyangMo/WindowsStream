@@ -50,14 +50,20 @@ std::string InputDiagnostics::MouseButton(const std::vector<uint8_t>& payload, b
     const auto thread = GetWindowThreadProcessId(foreground, nullptr);
     const bool haveGuiInfo = thread && GetGUIThreadInfo(thread, &info);
     const auto windowMode = info.flags & (GUI_INMOVESIZE | GUI_INMENUMODE | GUI_SYSTEMMENUMODE | GUI_POPUPMENUMODE);
+    const auto owner = foreground ? GetWindow(foreground, GW_OWNER) : nullptr;
+    const auto monitor = foreground ? MonitorFromWindow(foreground, MONITOR_DEFAULTTONULL) : nullptr;
+    MONITORINFO monitorInfo{sizeof monitorInfo};
+    const char* display = monitor && GetMonitorInfoW(monitor, &monitorInfo) ?
+        ((monitorInfo.dwFlags & MONITORINFOF_PRIMARY) ? "主屏" : "副屏") : "未知";
     const auto active = DescribeWindow(foreground);
     const auto hit = target == foreground ? active : DescribeWindow(target);
     static const auto hostIntegrity = Integrity(GetCurrentProcess());
     char message[1400]{};
     snprintf(message, sizeof message,
-        "鼠标回执：按钮 %u，%s，提交 %s；被控端完整性 %s，前台 %s，命中 %s；前台菜单或移动状态 %s，鼠标捕获 %s，输入桌面 %s，独占 %s",
+        "鼠标回执：按钮 %u，%s，提交 %s；被控端完整性 %s，前台 %s，命中 %s；前台屏幕 %s，所属窗口 %s，前台菜单或移动状态 %s，鼠标捕获 %s，输入桌面 %s，独占 %s",
         static_cast<unsigned>(payload[0]), payload[1] ? "按下" : "松开", submitted ? "成功" : "失败",
-        hostIntegrity.c_str(), active.c_str(), hit.c_str(), haveGuiInfo ? std::to_string(windowMode).c_str() : "未知",
+        hostIntegrity.c_str(), active.c_str(), hit.c_str(), display, owner ? (IsWindowEnabled(owner) ? "可用" : "被禁用") : "无",
+        haveGuiInfo ? std::to_string(windowMode).c_str() : "未知",
         haveGuiInfo ? (info.hwndCapture ? "有" : "无") : "未知",
         servermode::DesktopAccessible() ? "可用" : "不可用", exclusive ? "开启" : "关闭");
     return message;

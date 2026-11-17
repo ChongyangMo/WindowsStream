@@ -158,10 +158,18 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
         if (now >= next) {
             bool submitted = false;
             const bool request = forceKeyframe.exchange(false);
+            const bool wasPaused = stream.CapturePaused();
             if (!stream.Capture(request, submitted, sink)) {
                 if (stream.CaptureLost()) LogLine("采集源中断（合盖、屏幕关闭或桌面切换），保留当前编码配置重新建立连接");
                 videoFailed = !networkFailed && !stream.CaptureLost();
                 break;
+            }
+            if (wasPaused != stream.CapturePaused()) {
+                const std::string message = wasPaused ? "画面采集已恢复" : "画面采集暂不可用，控制连接保持";
+                LogLine("%s", message.c_str());
+                Writer status;
+                status.append(message.data(), message.size());
+                if (!channel.Send(MsgHostInfo, status)) break;
             }
             if (request && !submitted) forceKeyframe = true;
             // 落后时跳到最新采样时刻，不堆积过期桌面或补发一串历史帧。

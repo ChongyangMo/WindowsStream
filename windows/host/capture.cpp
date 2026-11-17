@@ -16,6 +16,7 @@ void DesktopCapture::Reset() {
     previous_ = nullptr;
     pixels_ = nullptr;
     refreshHz_ = 0;
+    retryAt_ = 0;
 }
 
 bool DesktopCapture::Initialize(int maxWidth, int maxHeight, bool gpu) {
@@ -61,22 +62,33 @@ bool DesktopCapture::Initialize(int maxWidth, int maxHeight, bool gpu) {
     return true;
 }
 
-bool DesktopCapture::Read() {
+CaptureResult DesktopCapture::WaitForDesktop() {
+    retryAt_ = GetTickCount64() + 250;
+    return CaptureResult::Unavailable;
+}
+
+CaptureResult DesktopCapture::Read() {
     if (GetSystemMetrics(SM_CXSCREEN) != sourceWidth_ || GetSystemMetrics(SM_CYSCREEN) != sourceHeight_) {
         LogLine("主屏分辨率发生变化，需要重新建立画面连接");
-        return false;
+        return CaptureResult::Failed;
     }
+    if (GetTickCount64() < retryAt_) return CaptureResult::Unavailable;
     // 普通用户仍只采集默认桌面；服务器代理在系统权限下绑定当前输入桌面。
     if (!servermode::DesktopAccessible()) {
-        LogLine("当前桌面不可访问，可能处于锁屏或管理员确认界面");
-        return false;
+        if (servermode::SecureAgent()) return CaptureResult::Failed;
+        if (!retryAt_) LogLine("当前桌面不可访问，保留连接等待桌面恢复");
+        return WaitForDesktop();
     }
-    if (!StretchBlt(memory_, 0, 0, width_, height_, screen_, 0, 0, sourceWidth_, sourceHeight_, SRCCOPY | CAPTUREBLT)) {
-        LogLine("采集桌面失败：%lu", GetLastError());
-        return false;
+    if (!screen_) screen_ = GetDC(nullptr);
+    if (!screen_ || !StretchBlt(memory_, 0, 0, width_, height_, screen_, 0, 0, sourceWidth_, sourceHeight_, SRCCOPY | CAPTUREBLT)) {
+        if (!retryAt_) LogLine("GDI 采集暂不可用，错误码 %lu", GetLastError());
+        if (screen_) ReleaseDC(nullptr, screen_);
+        screen_ = nullptr;
+        return WaitForDesktop();
     }
     GdiFlush();
-    return true;
+    retryAt_ = 0;
+    return CaptureResult::Frame;
 }
 
 std::string DesktopCapture::Description() const {
