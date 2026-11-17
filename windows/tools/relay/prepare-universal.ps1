@@ -12,11 +12,14 @@ $hostOutput = Join-Path $releaseRoot 'host'
 if (!$HostProgram) { $HostProgram = Join-Path $hostOutput '.runtime/WindowsStreamHost.exe' }
 $hostProgram = (Resolve-Path -LiteralPath $HostProgram).Path
 $root = Join-Path (Split-Path -Parent $releaseRoot) 'obj/relay/universal'
-$hostFolder = Join-Path $root 'host'
-$server = Join-Path $root 'server'
+$staging = Join-Path $releaseRoot '.staging'
+$relayStaging = Join-Path $staging 'relay/universal'
+$hostFolder = Join-Path $relayStaging 'host'
+$server = Join-Path $relayStaging 'server'
+$registrationFolder = Join-Path $root 'host'
 $controller = Join-Path $releaseRoot 'controller'
 $controllerRuntime = Join-Path $controller '.runtime'
-foreach ($folder in @($hostFolder, $server, $controllerRuntime, $hostOutput)) {
+foreach ($folder in @($hostFolder, $server, $registrationFolder, $controllerRuntime, $hostOutput)) {
     $null = New-Item -ItemType Directory -Path $folder -Force
 }
 
@@ -25,13 +28,14 @@ $go = (Read-RelaySection (Join-Path $goRoot '../config/build.ini') 'tools').go
 if (!(Test-Path -LiteralPath $go -PathType Leaf)) {
     throw '请在 windows\config\build.ini 中配置 Go 可执行文件。'
 }
+$hostBridge = Join-Path $hostFolder 'WindowsStreamBridge.exe'
 if (!$Bridge) {
-    $Bridge = Join-Path $root 'WindowsStreamBridge.exe'
+    $Bridge = $hostBridge
     & (Join-Path $PSScriptRoot 'build-bridge.ps1') -Output $Bridge
 }
 $bridgeProgram = (Resolve-Path -LiteralPath $Bridge).Path
 
-$registration = Join-Path $hostFolder 'enrollment.ini'
+$registration = Join-Path $registrationFolder 'enrollment.ini'
 if (!(Test-Path -LiteralPath $registration)) {
     Write-RelayIni $registration @"
 [enrollment]
@@ -52,7 +56,7 @@ function Copy-Launcher([string]$Name, [string]$Folder) {
 }
 
 Copy-Item -LiteralPath $hostProgram -Destination $hostFolder -Force
-Copy-Item -LiteralPath $bridgeProgram -Destination (Join-Path $hostFolder 'WindowsStreamBridge.exe') -Force
+if ($bridgeProgram -ne $hostBridge) { Copy-Item -LiteralPath $bridgeProgram -Destination $hostBridge -Force }
 $scripts = @('takeover.ps1','pairing.ps1','start-host.ps1','install-configured.ps1')
 foreach ($launcher in $scripts) {
     Copy-Launcher $launcher $hostFolder
@@ -66,8 +70,8 @@ http_proxy=$ControllerProxy
 "@
 }
 
-$package = @('enrollment.ini','WindowsStreamHost.exe','WindowsStreamBridge.exe','host.ini.template') + $scripts
-$files = foreach ($name in $package) { Join-Path $hostFolder $name }
+$package = @('WindowsStreamHost.exe','WindowsStreamBridge.exe','host.ini.template') + $scripts
+$files = @($registration) + @(foreach ($name in $package) { Join-Path $hostFolder $name })
 $payload = Join-Path $root 'host-payload.zip'
 Compress-Archive -LiteralPath $files -DestinationPath $payload -Force
 
@@ -83,7 +87,7 @@ try {
 } finally { Pop-Location }
 $oldLauncher = Join-Path $hostOutput 'WindowsStream-RelayHost.exe'
 if (Test-Path -LiteralPath $oldLauncher -PathType Leaf) { [IO.File]::Delete($oldLauncher) }
-foreach ($folder in @($controllerRuntime, (Join-Path $hostOutput '.runtime'))) {
+foreach ($folder in @($staging, $controllerRuntime, (Join-Path $hostOutput '.runtime'))) {
     $runtime = Get-Item -LiteralPath $folder -Force -ErrorAction SilentlyContinue
     if ($runtime) { $runtime.Attributes = $runtime.Attributes -bor [IO.FileAttributes]::Hidden }
 }

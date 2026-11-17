@@ -11,10 +11,10 @@ $key = $address.ToString().Replace('.', '-')
 $name = $address.ToString()
 $releaseRoot = [IO.Path]::GetFullPath($Release)
 $folder = Join-Path (Split-Path -Parent $releaseRoot) "obj/relay/$key"
-$server = Join-Path $folder 'server'
-$viewer = Join-Path $folder 'controller'
+$server = Join-Path $releaseRoot ".staging/relay/$key/server"
+$viewer = Join-Path $releaseRoot "controller/connections/relay-$key"
 $hostFolder = Join-Path $folder 'host'
-$bridge = Join-Path $viewer 'WindowsStreamBridge.exe'
+$bridge = Join-Path $releaseRoot 'controller/.runtime/WindowsStreamBridge.exe'
 $hostProgram = Join-Path $releaseRoot 'host/WindowsStream-Host.exe'
 $hostConfig = @((Join-Path $hostFolder 'host.ini'), (Join-Path $hostFolder 'relay.ini'))
 $serverConfig = Join-Path $server 'windowsstream-relay.ini'
@@ -62,12 +62,13 @@ if ($existing.Count -eq $hostConfig.Count) {
     Write-Output ('已沿用原配对并更新被控端包：' + $name)
     return
 }
-$configuration = $hostConfig + @($serverConfig, (Join-Path $viewer 'relay.ini'), (Join-Path $viewer 'client.ini'))
+$configuration = $hostConfig + @($serverConfig, (Join-Path $viewer 'relay.ini'), (Join-Path $viewer 'client.ini'),
+    (Join-Path $folder 'server/windowsstream-relay.ini'), (Join-Path $folder 'controller/client.ini'), (Join-Path $folder 'controller/relay.ini'))
 if ($configuration | Where-Object { Test-Path -LiteralPath $_ }) {
     throw '已有设备的被控端配置不完整，请补齐后再打包。'
 }
 if (!(Test-Path -LiteralPath $bridge -PathType Leaf)) { throw ('请先构建：' + $bridge) }
-foreach ($dir in @($server, $hostFolder)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
+foreach ($dir in @($server, $hostFolder, $viewer)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
 
 $hostKey = New-Secret
 $viewerKey = New-Secret
@@ -144,7 +145,7 @@ enabled=0
 [updates]
 enabled=0
 "@ ([Text.Encoding]::Unicode)
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Open-WindowsStream.cmd') -Destination $viewer
+Copy-Item -LiteralPath $bridge, (Join-Path $PSScriptRoot 'Open-WindowsStream.cmd') -Destination $viewer
 $launcher = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'open-controller.ps1'), $utf8)
 [IO.File]::WriteAllText((Join-Path $viewer 'open-controller.ps1'), $launcher, [Text.UTF8Encoding]::new($true))
 $launcher = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'takeover.ps1'), $utf8)

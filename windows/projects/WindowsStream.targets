@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Target Name="ValidateWindowsStreamOutput" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <_WindowsStreamOutputRoot Condition="'$(Configuration)'=='Debug'">$(WindowsRoot)build\1debug</_WindowsStreamOutputRoot>
+      <_WindowsStreamOutputRoot Condition="'$(Configuration)'=='Release'">$(WindowsRoot)build\2release</_WindowsStreamOutputRoot>
+      <_WindowsStreamExpectedOut>$([MSBuild]::EnsureTrailingSlash($([System.IO.Path]::GetFullPath('$(_WindowsStreamOutputRoot)\$(ArtifactDirectory)'))))</_WindowsStreamExpectedOut>
+      <_WindowsStreamActualOut>$([MSBuild]::EnsureTrailingSlash($([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(OutDir)'))))))</_WindowsStreamActualOut>
+    </PropertyGroup>
+    <Error Condition="'$(_WindowsStreamOutputRoot)' == '' Or '$(_WindowsStreamActualOut)' != '$(_WindowsStreamExpectedOut)'"
+           Text="请使用 WindowsStream 默认输出目录，Debug 使用 build\1debug，Release 使用 build\2release。" />
+  </Target>
   <Target Name="CopyPortableFiles" AfterTargets="Build">
     <MakeDir Directories="$(OutDir)" />
     <Copy SourceFiles="@(PortableTool)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
