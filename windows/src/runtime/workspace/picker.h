@@ -12,6 +12,7 @@ private:
     static LRESULT CALLBACK Procedure(HWND, UINT, WPARAM, LPARAM);
     void Select();
     void Connect();
+    void ImportPair();
     HWND window_ = nullptr, list_ = nullptr, host_ = nullptr, port_ = nullptr, token_ = nullptr, error_ = nullptr;
     std::wstring base_;
     std::vector<Profile> profiles_;

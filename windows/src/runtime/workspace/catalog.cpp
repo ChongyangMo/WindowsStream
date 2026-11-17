@@ -45,12 +45,14 @@ std::vector<Profile> LoadProfiles(const std::wstring& base) {
         if (GetFileAttributesW(full.c_str()) == INVALID_FILE_ATTRIBUTES) continue;
         profiles.push_back({ReadSetting(full.wstring(), L"connection", L"name", L"WindowsStream"), full.wstring(), false});
     }
-    std::error_code error;
-    const auto folder = std::filesystem::path(base).parent_path() / L"connections";
-    for (std::filesystem::directory_iterator it(folder, error), end; !error && it != end; it.increment(error)) {
-        const auto path = it->path() / L"client.ini";
-        if (GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES)
-            profiles.push_back({ReadSetting(path.wstring(), L"connection", L"name", L"WindowsStream"), path.wstring(), false});
+    for (const auto* directory : {L"connections", L"relay-devices"}) {
+        std::error_code error;
+        const auto folder = std::filesystem::path(base).parent_path() / directory;
+        for (std::filesystem::directory_iterator it(folder, error), end; !error && it != end; it.increment(error)) {
+            const auto path = it->path() / L"client.ini";
+            if (GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES)
+                profiles.push_back({ReadSetting(path.wstring(), L"connection", L"name", L"WindowsStream"), path.wstring(), false});
+        }
     }
     return profiles;
 }

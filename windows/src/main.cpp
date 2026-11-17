@@ -4,6 +4,7 @@
 #include "net.h"
 #include "video.h"
 #include "file_drag/gesture.h"
+#include "runtime/relay.h"
 #include "updates/server.h"
 #include "proxy/server.h"
 #include "locate/responder.h"
@@ -883,6 +884,13 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     WSADATA wsa;
     WSAStartup(MAKEWORD(2, 2), &wsa);
     LoadSettings();
+    ViewerRelay relay;
+    std::wstring relayError;
+    if (!relay.Start(ConfigPath(), g_settings.port, relayError)) {
+        LogLine("%s", WideToUtf8(relayError).c_str());
+        MessageBoxW(nullptr, relayError.c_str(), L"WindowsStream", MB_ICONERROR);
+        return 1;
+    }
     UpdateServer updateServer;
     ProxyServer proxyServer;
     if (g_startup.primary) {

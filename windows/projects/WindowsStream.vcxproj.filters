@@ -48,11 +48,13 @@
     <ClCompile Include="..\src\proxy\vm_networks.cpp"><Filter>src\proxy</Filter></ClCompile>
     <ClCompile Include="..\src\proxy\vm_pac.cpp"><Filter>src\proxy</Filter></ClCompile>
     <ClCompile Include="..\src\runtime\profile.cpp"><Filter>src\runtime</Filter></ClCompile>
+    <ClCompile Include="..\src\runtime\relay.cpp"><Filter>src\runtime</Filter></ClCompile>
     <ClCompile Include="..\src\runtime\tray.cpp"><Filter>src\runtime</Filter></ClCompile>
     <ClCompile Include="..\src\runtime\workspace.cpp"><Filter>src\runtime</Filter></ClCompile>
     <ClCompile Include="..\src\runtime\workspace\catalog.cpp"><Filter>src\runtime\workspace</Filter></ClCompile>
     <ClCompile Include="..\src\runtime\workspace\frame.cpp"><Filter>src\runtime\workspace</Filter></ClCompile>
     <ClCompile Include="..\src\runtime\workspace\network_menu.cpp"><Filter>src\runtime\workspace</Filter></ClCompile>
+    <ClCompile Include="..\src\runtime\workspace\pairing.cpp"><Filter>src\runtime\workspace</Filter></ClCompile>
     <ClCompile Include="..\src\runtime\workspace\picker.cpp"><Filter>src\runtime\workspace</Filter></ClCompile>
     <ClCompile Include="..\src\runtime\workspace\tabs.cpp"><Filter>src\runtime\workspace</Filter></ClCompile>
     <ClCompile Include="..\src\tunnel\manager.cpp"><Filter>src\tunnel</Filter></ClCompile>
@@ -91,6 +93,7 @@
     <ClInclude Include="..\src\proxy\tcp_forwards.h"><Filter>src\proxy</Filter></ClInclude>
     <ClInclude Include="..\src\proxy\vm_networks.h"><Filter>src\proxy</Filter></ClInclude>
     <ClInclude Include="..\src\runtime\profile.h"><Filter>src\runtime</Filter></ClInclude>
+    <ClInclude Include="..\src\runtime\relay.h"><Filter>src\runtime</Filter></ClInclude>
     <ClInclude Include="..\src\runtime\tray.h"><Filter>src\runtime</Filter></ClInclude>
     <ClInclude Include="..\src\runtime\workspace.h"><Filter>src\runtime</Filter></ClInclude>
     <ClInclude Include="..\src\runtime\workspace\catalog.h"><Filter>src\runtime\workspace</Filter></ClInclude>

@@ -24,7 +24,7 @@
   </PropertyGroup>
   <Import Project="WindowsStream.props" />
   <ItemDefinitionGroup>
-    <Link><AdditionalDependencies>d3d11.lib;dxgi.lib;mfplat.lib;mfuuid.lib;wmcodecdspuuid.lib;strmiids.lib;d3dcompiler.lib;imm32.lib;wininet.lib;comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
+    <Link><AdditionalDependencies>d3d11.lib;dxgi.lib;mfplat.lib;mfuuid.lib;wmcodecdspuuid.lib;strmiids.lib;d3dcompiler.lib;imm32.lib;wininet.lib;comctl32.lib;comdlg32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\src\file_drag\gesture.cpp" />
@@ -59,11 +59,13 @@
     <ClCompile Include="..\src\proxy\vm_networks.cpp" />
     <ClCompile Include="..\src\proxy\vm_pac.cpp" />
     <ClCompile Include="..\src\runtime\profile.cpp" />
+    <ClCompile Include="..\src\runtime\relay.cpp" />
     <ClCompile Include="..\src\runtime\tray.cpp" />
     <ClCompile Include="..\src\runtime\workspace.cpp" />
     <ClCompile Include="..\src\runtime\workspace\catalog.cpp" />
     <ClCompile Include="..\src\runtime\workspace\frame.cpp" />
     <ClCompile Include="..\src\runtime\workspace\network_menu.cpp" />
+    <ClCompile Include="..\src\runtime\workspace\pairing.cpp" />
     <ClCompile Include="..\src\runtime\workspace\picker.cpp" />
     <ClCompile Include="..\src\runtime\workspace\tabs.cpp" />
     <ClCompile Include="..\src\tunnel\manager.cpp" />
@@ -104,6 +106,7 @@
     <ClInclude Include="..\src\proxy\tcp_forwards.h" />
     <ClInclude Include="..\src\proxy\vm_networks.h" />
     <ClInclude Include="..\src\runtime\profile.h" />
+    <ClInclude Include="..\src\runtime\relay.h" />
     <ClInclude Include="..\src\runtime\tray.h" />
     <ClInclude Include="..\src\runtime\workspace.h" />
     <ClInclude Include="..\src\runtime\workspace\catalog.h" />
@@ -126,4 +129,7 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="WindowsStream.targets" />
+  <Target Name="BuildControllerRelay" AfterTargets="CopyPortableFiles">
+    <Exec Command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(WindowsRoot)tools\relay\build-bridge.ps1&quot; -Output &quot;$(OutDir).runtime\WindowsStreamBridge.exe&quot;" />
+  </Target>
 </Project>

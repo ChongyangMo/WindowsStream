@@ -58,12 +58,21 @@ func hostConnection(c config, state *relayLog) (bool, error) {
 	return true, nil
 }
 
-func serveViewer(c config) error {
+func serveViewer(c config, announcePort bool) error {
+	if announcePort {
+		c.local = "127.0.0.1:0"
+	}
 	listener, err := net.Listen("tcp", c.local)
 	if err != nil {
 		return err
 	}
 	defer listener.Close()
+	if announcePort {
+		if _, err := fmt.Fprintln(os.Stdout, listener.Addr().(*net.TCPAddr).Port); err != nil {
+			return fmt.Errorf("无法向控制端返回中转端口：%w", err)
+		}
+		_ = os.Stdout.Close()
+	}
 	log.Println("控制端中转已就绪")
 	var state relayLog
 	for {
@@ -108,21 +117,32 @@ func main() {
 		log.Fatal("无法读取中转程序位置：", err)
 	}
 	root := filepath.Dir(executable)
+	configPath := filepath.Join(root, "relay.ini")
+	announcePort := len(os.Args) == 3 && os.Args[1] == "--viewer-config"
+	if announcePort {
+		configPath = os.Args[2]
+		root = filepath.Dir(configPath)
+	} else if len(os.Args) != 1 {
+		log.Fatal("中转组件启动参数无效")
+	}
 	file, err := os.OpenFile(filepath.Join(root, "relay.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		log.Fatal("无法打开中转日志：", err)
 	}
 	defer file.Close()
 	log.SetOutput(file)
-	c, err := loadConfig(filepath.Join(root, "relay.ini"))
+	c, err := loadConfig(configPath)
 	if err != nil {
 		log.Fatal("读取中转配置失败：", err)
 	}
 	if c.role == "host" {
+		if announcePort {
+			log.Fatal("控制端需要使用查看端中转配置")
+		}
 		serveHost(c)
 		return
 	}
-	if err := serveViewer(c); err != nil {
+	if err := serveViewer(c, announcePort); err != nil {
 		log.Fatal("控制端中转已退出：", err)
 	}
 }

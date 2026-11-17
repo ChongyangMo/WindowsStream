@@ -27,11 +27,7 @@ if (!(Test-Path -LiteralPath $go -PathType Leaf)) {
 }
 if (!$Bridge) {
     $Bridge = Join-Path $root 'WindowsStreamBridge.exe'
-    Push-Location -LiteralPath $goRoot
-    try {
-        & $go build -buildvcs=false -trimpath -mod=readonly -o $Bridge .
-        if ($LASTEXITCODE -ne 0) { throw '中转组件构建失败。' }
-    } finally { Pop-Location }
+    & (Join-Path $PSScriptRoot 'build-bridge.ps1') -Output $Bridge
 }
 $bridgeProgram = (Resolve-Path -LiteralPath $Bridge).Path
 
@@ -57,16 +53,11 @@ function Copy-Launcher([string]$Name, [string]$Folder) {
 
 Copy-Item -LiteralPath $hostProgram -Destination $hostFolder -Force
 Copy-Item -LiteralPath $bridgeProgram -Destination (Join-Path $hostFolder 'WindowsStreamBridge.exe') -Force
-Copy-Item -LiteralPath $bridgeProgram -Destination (Join-Path $controllerRuntime 'WindowsStreamBridge.exe') -Force
-
 foreach ($launcher in @('takeover.ps1','pairing.ps1')) {
     Copy-Launcher $launcher $hostFolder
-    Copy-Launcher $launcher $controllerRuntime
 }
 Copy-Launcher 'start-host.ps1' $hostFolder
-Copy-Launcher 'connect-universal.ps1' $controllerRuntime
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'host.ini.template') -Destination $hostFolder -Force
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Connect-WindowsStream.cmd') -Destination $controller -Force
 $network = Join-Path $controllerRuntime 'relay-network.ini'
 if (!(Test-Path -LiteralPath $network)) {
     Write-RelayIni $network @"
@@ -94,4 +85,4 @@ foreach ($folder in @($controllerRuntime, (Join-Path $hostOutput '.runtime'))) {
     $runtime = Get-Item -LiteralPath $folder -Force -ErrorAction SilentlyContinue
     if ($runtime) { $runtime.Attributes = $runtime.Attributes -bor [IO.FileAttributes]::Hidden }
 }
-Write-Output '已生成通用被控端和控制端配对入口。'
+Write-Output '已生成通用被控端。'

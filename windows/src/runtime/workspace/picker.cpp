@@ -1,7 +1,10 @@
 #include "picker.h"
+#include "../relay.h"
 #include "../../../shared/app_icon.h"
+#include <commdlg.h>
 
 namespace workspace {
+namespace { constexpr int kImportPair = 11; }
 void ConnectionPicker::Show(HWND owner, const std::wstring& base, std::function<void(const Profile&)> open) {
     if (window_) { ShowWindow(window_, SW_SHOW); SetForegroundWindow(window_); return; }
     base_ = base; open_ = std::move(open); profiles_ = LoadProfiles(base);
@@ -34,29 +37,66 @@ void ConnectionPicker::Show(HWND owner, const std::wstring& base, std::function<
     token_ = child(L"EDIT", ReadSetting(base_, L"connection", L"token").c_str(), WS_TABSTOP | ES_PASSWORD | ES_AUTOHSCROLL, 78, 146, 282, 28);
     SendMessageW(host_, EM_SETLIMITTEXT, 253, 0); SendMessageW(port_, EM_SETLIMITTEXT, 5, 0); SendMessageW(token_, EM_SETLIMITTEXT, 511, 0);
     error_ = child(L"STATIC", L"", 0, 20, 189, 340, 36);
+    child(L"BUTTON", L"导入配对文件", WS_TABSTOP, 20, 239, 135, 30, kImportPair);
     child(L"BUTTON", L"连接", WS_TABSTOP | BS_DEFPUSHBUTTON, 260, 239, 100, 30, IDOK);
     ShowWindow(window_, SW_SHOW); SetFocus(host_);
 }
 void ConnectionPicker::Select() {
     const auto index = SendMessageW(list_, CB_GETCURSEL, 0, 0);
-    if (index <= 0 || static_cast<size_t>(index) > profiles_.size()) {
+    const Profile* profile = index > 0 && static_cast<size_t>(index) <= profiles_.size()
+        ? &profiles_[static_cast<size_t>(index) - 1] : nullptr;
+    const bool relay = profile && !ViewerRelayConfig(profile->path).empty();
+    for (const auto field : {host_, port_, token_}) EnableWindow(field, !relay);
+    SetWindowTextW(error_, L"");
+    if (relay) {
+        for (const auto field : {host_, port_, token_}) SetWindowTextW(field, L"");
+        return;
+    }
+    if (!profile) {
         SetWindowTextW(host_, L""); SetWindowTextW(port_, L"7400");
         SetWindowTextW(token_, ReadSetting(base_, L"connection", L"token").c_str());
         return;
     }
-    const auto& profile = profiles_[static_cast<size_t>(index) - 1];
-    SetWindowTextW(host_, ReadSetting(profile.path, L"connection", L"host").c_str());
-    SetWindowTextW(port_, ReadSetting(profile.path, L"connection", L"port", L"7400").c_str());
-    SetWindowTextW(token_, ReadSetting(profile.path, L"connection", L"token").c_str());
-    SetWindowTextW(error_, L"");
+    SetWindowTextW(host_, ReadSetting(profile->path, L"connection", L"host").c_str());
+    SetWindowTextW(port_, ReadSetting(profile->path, L"connection", L"port", L"7400").c_str());
+    SetWindowTextW(token_, ReadSetting(profile->path, L"connection", L"token").c_str());
 }
 void ConnectionPicker::Connect() {
+    const auto index = SendMessageW(list_, CB_GETCURSEL, 0, 0);
+    if (index > 0 && static_cast<size_t>(index) <= profiles_.size()) {
+        const auto& profile = profiles_[static_cast<size_t>(index) - 1];
+        if (!ViewerRelayConfig(profile.path).empty()) {
+            open_(profile); Close(); return;
+        }
+    }
     wchar_t host[256]{}, port[8]{}, token[512]{};
     GetWindowTextW(host_, host, 256); GetWindowTextW(port_, port, 8); GetWindowTextW(token_, token, 512);
     wchar_t* end = nullptr; const auto number = wcstoul(port, &end, 10);
     Profile profile; std::wstring error;
     if (!*port || *end || !SaveProfile(base_, host, static_cast<unsigned>(number), token, profile, error)) {
         SetWindowTextW(error_, error.empty() ? L"请输入有效端口" : error.c_str()); return;
+    }
+    open_(profile); Close();
+}
+
+void ConnectionPicker::ImportPair() {
+    wchar_t file[32768]{};
+    OPENFILENAMEW dialog{sizeof dialog};
+    dialog.hwndOwner = window_;
+    dialog.lpstrFilter = L"WindowsStream 配对文件 (*.ini)\0*.ini\0\0";
+    dialog.lpstrFile = file;
+    dialog.nMaxFile = static_cast<DWORD>(std::size(file));
+    dialog.lpstrTitle = L"导入配对文件";
+    dialog.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR | OFN_DONTADDTORECENT;
+    if (!GetOpenFileNameW(&dialog)) {
+        if (CommDlgExtendedError()) SetWindowTextW(error_, L"无法打开文件选择窗口");
+        return;
+    }
+    Profile profile;
+    std::wstring error;
+    if (!ImportRelayPair(base_, file, profile, error)) {
+        SetWindowTextW(error_, error.c_str());
+        return;
     }
     open_(profile); Close();
 }
@@ -71,6 +111,7 @@ LRESULT CALLBACK ConnectionPicker::Procedure(HWND window, UINT message, WPARAM w
     if (self) {
         if (message == WM_COMMAND && LOWORD(wParam) == 10 && HIWORD(wParam) == CBN_SELCHANGE) { self->Select(); return 0; }
         if (message == WM_COMMAND && LOWORD(wParam) == IDOK) { self->Connect(); return 0; }
+        if (message == WM_COMMAND && LOWORD(wParam) == kImportPair) { self->ImportPair(); return 0; }
         if ((message == WM_COMMAND && LOWORD(wParam) == IDCANCEL) || message == WM_CLOSE) { self->Close(); return 0; }
         if (message == WM_NCDESTROY) self->window_ = nullptr;
     }

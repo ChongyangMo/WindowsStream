@@ -10,4 +10,5 @@ std::wstring ReadSetting(const std::wstring& path, const wchar_t* section, const
 std::vector<Profile> LoadProfiles(const std::wstring& base);
 bool SaveProfile(const std::wstring& base, const std::wstring& host, unsigned port,
                  const std::wstring& token, Profile& profile, std::wstring& error);
+bool ImportRelayPair(const std::wstring& base, const std::wstring& file, Profile& profile, std::wstring& error);
 }
