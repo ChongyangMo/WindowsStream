@@ -10,7 +10,7 @@ public:
     // 网络线程处理协商与内容回复，窗口线程处理鼠标手势和原生拖放。
     void Connect(HWND viewer, const std::shared_ptr<Connection>& connection);
     void Disconnect();
-    bool Receive(uint8_t type, std::vector<uint8_t>& data);
+    void Receive(uint8_t type, std::vector<uint8_t>& data);
     void Press();
     void Cancel();
     void Probe(HWND viewer, int x, int y);

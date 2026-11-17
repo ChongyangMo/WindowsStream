@@ -4,6 +4,7 @@
 #include <wrl/implements.h>
 #include <chrono>
 #include <condition_variable>
+#include <string_view>
 
 namespace filedrag {
 namespace {

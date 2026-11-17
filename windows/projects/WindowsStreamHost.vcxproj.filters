@@ -14,7 +14,7 @@
     <Filter Include="src"><UniqueIdentifier>{349bdbc3-ba56-4f08-8635-dcd865d2673b}</UniqueIdentifier></Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\host\file_drag\capture.cpp"><Filter>host\file_drag</Filter></ClCompile>
+    <ClCompile Include="..\host\file_drag\drop_target.cpp"><Filter>host\file_drag</Filter></ClCompile>
     <ClCompile Include="..\host\file_drag\sender.cpp"><Filter>host\file_drag</Filter></ClCompile>
     <ClCompile Include="..\host\capture_diag.cpp"><Filter>host</Filter></ClCompile>
     <ClCompile Include="..\host\capture_gpu.cpp"><Filter>host</Filter></ClCompile>

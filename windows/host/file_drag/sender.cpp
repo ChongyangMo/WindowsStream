@@ -58,8 +58,12 @@ void Sender::Probe(uint32_t id, InputInjector& input) {
     if (input.CanHandOffDrag() && offers_.size() < 8 && !offers_.contains(id) && servermode::DesktopAccessible()) {
         const auto paths = capture_.Probe(id);
         if (!paths.empty()) {
-            if (input.FinishFileDrag()) files = OpenFiles(paths);
-            if (files.empty()) LogLine("无法读取本次拖拽的文件，目录及不可读文件无法传输");
+            files = OpenFiles(paths);
+            if (files.empty()) {
+                LogLine("无法读取本次拖拽的文件，目录及不可读文件无法传输");
+            } else if (!input.FinishFileDrag()) {
+                files.clear();
+            }
         }
         capture_.Hide(id);
     }

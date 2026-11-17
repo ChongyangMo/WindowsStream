@@ -17,22 +17,22 @@ void Gesture::Disconnect() {
     waiting_ = 0;
 }
 
-bool Gesture::Receive(uint8_t type, std::vector<uint8_t>& data) {
+void Gesture::Receive(uint8_t type, std::vector<uint8_t>& data) {
     switch (type) {
         case MsgFileDragAvailable: {
             std::lock_guard lock(mutex_);
             if (data.empty()) available_ = true;
-            return true;
+            return;
         }
         case MsgFileDragData:
             // 仅网络线程更换 peer_。
             peer_->Receive(data);
-            return true;
+            return;
         case MsgFileDragOffer: {
-            if (data.size() < 4) return true;
+            if (data.size() < 4) return;
             const auto id = ReadU32(data.data());
             std::lock_guard lock(mutex_);
-            if (!waiting_ || id != waiting_) return true;
+            if (!waiting_ || id != waiting_) return;
             auto files = ReadOffer(data);
             if (files.empty()) {
                 waiting_ = 0;
@@ -40,10 +40,10 @@ bool Gesture::Receive(uint8_t type, std::vector<uint8_t>& data) {
                 offer_ = std::make_shared<Offer>(peer_, id, std::move(files));
                 PostMessageW(viewer_, kOfferReady, 0, 0);
             }
-            return true;
+            return;
         }
         default:
-            return false;
+            return;
     }
 }
 

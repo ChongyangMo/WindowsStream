@@ -5,7 +5,8 @@
 
 namespace filedrag {
 class RemoteStream final : public Microsoft::WRL::RuntimeClass<
-    Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, IStream, Microsoft::WRL::FtmBase> {
+    Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
+    Microsoft::WRL::ChainInterfaces<IStream, ISequentialStream>, Microsoft::WRL::FtmBase> {
 public:
     RemoteStream(std::shared_ptr<Offer> offer, uint16_t index, uint64_t position = 0)
         : offer_(std::move(offer)), index_(index), position_(position) {}
