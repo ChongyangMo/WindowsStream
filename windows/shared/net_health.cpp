@@ -1,6 +1,7 @@
 #include "net_health.h"
 #include <iphlpapi.h>
 #include <mstcpip.h>
+#include <utility>
 
 namespace net {
 namespace {
@@ -27,6 +28,36 @@ struct LanAddress {
     bool multiple = false;
     ULONG gatewayMetric = 0;
 };
+
+std::vector<uint8_t> ReadIPv4Adapters(ULONG extraFlags) {
+    ULONG size = 16384;
+    std::vector<uint8_t> buffer;
+    ULONG status = ERROR_BUFFER_OVERFLOW;
+    const ULONG flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER | extraFlags;
+    for (int attempt = 0; attempt < 3 && status == ERROR_BUFFER_OVERFLOW; ++attempt) {
+        buffer.resize(size);
+        status = GetAdaptersAddresses(AF_INET, flags, nullptr,
+                                      reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data()), &size);
+    }
+    if (status != NO_ERROR) return {};
+    return buffer;
+}
+
+bool UsableAdapter(const IP_ADAPTER_ADDRESSES& adapter) {
+    return adapter.OperStatus == IfOperStatusUp && adapter.IfType != IF_TYPE_SOFTWARE_LOOPBACK;
+}
+
+bool HardwareInterface(const IP_ADAPTER_ADDRESSES& adapter) {
+    MIB_IF_ROW2 row{};
+    row.InterfaceLuid = adapter.Luid;
+    return GetIfEntry2(&row) == NO_ERROR && row.InterfaceAndOperStatusFlags.HardwareInterface;
+}
+
+const IN_ADDR* PreferredUnicastIPv4(const IP_ADAPTER_UNICAST_ADDRESS& entry) {
+    const auto* socketAddress = entry.Address.lpSockaddr;
+    if (!socketAddress || socketAddress->sa_family != AF_INET || entry.DadState != IpDadStatePreferred) return nullptr;
+    return &reinterpret_cast<const sockaddr_in*>(socketAddress)->sin_addr;
+}
 
 // 无法枚举时返回 true，交给 bind 判断。
 template <typename Match>
@@ -84,32 +115,40 @@ std::wstring SourceIPv4Address(const std::wstring& peer) {
     return RouteSource(destination, interfaceIndex);
 }
 
-std::wstring PreferredLanIPv4Address() {
-    ULONG size = 16384;
-    std::vector<uint8_t> buffer;
-    ULONG status = ERROR_BUFFER_OVERFLOW;
-    constexpr ULONG flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST |
-                            GAA_FLAG_SKIP_DNS_SERVER | GAA_FLAG_INCLUDE_GATEWAYS;
-    for (int attempt = 0; attempt < 3 && status == ERROR_BUFFER_OVERFLOW; ++attempt) {
-        buffer.resize(size);
-        status = GetAdaptersAddresses(AF_INET, flags, nullptr,
-                                      reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data()), &size);
+std::wstring PreferredIntranetIPv4Address() {
+    const auto buffer = ReadIPv4Adapters(0);
+    if (buffer.empty()) return {};
+
+    std::wstring preferred;
+    std::pair<bool, ULONG> bestRank{};
+    for (auto* adapter = reinterpret_cast<const IP_ADAPTER_ADDRESSES*>(buffer.data()); adapter; adapter = adapter->Next) {
+        if (!UsableAdapter(*adapter)) continue;
+        for (auto* entry = adapter->FirstUnicastAddress; entry; entry = entry->Next) {
+            const auto* ip = PreferredUnicastIPv4(*entry);
+            if (!ip || (ntohl(ip->s_addr) & 0xffff0000u) != 0x0a120000u) continue;
+            const auto rank = std::pair{!HardwareInterface(*adapter), adapter->Ipv4Metric};
+            if (preferred.empty() || rank < bestRank) {
+                preferred = IPv4Text(*ip);
+                bestRank = rank;
+            }
+            break;
+        }
     }
-    if (status != NO_ERROR) return {};
+    return preferred;
+}
+
+std::wstring PreferredLanIPv4Address() {
+    const auto buffer = ReadIPv4Adapters(GAA_FLAG_INCLUDE_GATEWAYS);
+    if (buffer.empty()) return {};
 
     LanAddress physical, other;
-    for (auto* adapter = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data()); adapter; adapter = adapter->Next) {
-        if (adapter->OperStatus != IfOperStatusUp || adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK) continue;
-        MIB_IF_ROW2 row{};
-        row.InterfaceLuid = adapter->Luid;
-        const bool hardware = GetIfEntry2(&row) == NO_ERROR && row.InterfaceAndOperStatusFlags.HardwareInterface;
-        auto& candidate = hardware ? physical : other;
+    for (auto* adapter = reinterpret_cast<const IP_ADAPTER_ADDRESSES*>(buffer.data()); adapter; adapter = adapter->Next) {
+        if (!UsableAdapter(*adapter)) continue;
+        auto& candidate = HardwareInterface(*adapter) ? physical : other;
         for (auto* entry = adapter->FirstUnicastAddress; entry; entry = entry->Next) {
-            const auto* socketAddress = entry->Address.lpSockaddr;
-            if (!socketAddress || socketAddress->sa_family != AF_INET || entry->DadState != IpDadStatePreferred) continue;
-            const auto& ip = reinterpret_cast<const sockaddr_in*>(socketAddress)->sin_addr;
-            if (ip.S_un.S_un_b.s_b1 == 127) continue;
-            const auto address = IPv4Text(ip);
+            const auto* ip = PreferredUnicastIPv4(*entry);
+            if (!ip || ip->S_un.S_un_b.s_b1 == 127) continue;
+            const auto address = IPv4Text(*ip);
             if (address.empty()) continue;
             if (candidate.first.empty()) candidate.first = address;
             else if (candidate.first != address) candidate.multiple = true;

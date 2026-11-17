@@ -21,7 +21,9 @@ HWND addressField = nullptr;
 std::wstring displayedAddress;
 
 std::wstring LocalAddress(const HostConfig& config) {
-    auto address = server.ConnectedLocalAddress();
+    auto address = net::PreferredIntranetIPv4Address();
+    if (!address.empty()) return address;
+    address = server.ConnectedLocalAddress();
     if (!address.empty()) return address;
     if (config.reverse) return net::SourceIPv4Address(Locator().Current());
     if (config.bindHost != L"0.0.0.0") return net::LocalAddressReady(config.bindHost) ? config.bindHost : L"";

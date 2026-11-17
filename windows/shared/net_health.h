@@ -6,6 +6,8 @@ namespace net {
 // 0.0.0.0 和回环地址总是可用；其他地址须当前存在于本机网卡且已完成冲突检测。
 bool LocalAddressReady(const std::wstring& address);
 std::wstring SourceIPv4Address(const std::wstring& peer);
+// 从本机已启用的网卡选择 10.18 内网 IPv4，优先使用物理网卡。
+std::wstring PreferredIntranetIPv4Address();
 // 优先选择有网关的物理网卡；无网关时只使用明确的单一地址。
 std::wstring PreferredLanIPv4Address();
 // 已打开的监听器按间隔复查地址，避免每次轮询都枚举网卡。
