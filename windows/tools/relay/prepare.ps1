@@ -16,6 +16,7 @@ $viewer = Join-Path $folder 'controller'
 $hostFolder = Join-Path $folder 'host'
 $bridge = Join-Path $viewer 'WindowsStreamBridge.exe'
 $hostProgram = Join-Path $releaseRoot 'host/WindowsStream-Host.exe'
+$hostConfig = @((Join-Path $hostFolder 'host.ini'), (Join-Path $hostFolder 'relay.ini'))
 $serverConfig = Join-Path $server 'windowsstream-relay.ini'
 $endpoint = 'wss://sdserver.luxvisions-inno.com/api/windowsstream/relay'
 $target = '10.18.32.67:443'
@@ -39,14 +40,34 @@ function Write-Ini([string]$Path, [string]$Content, [Text.Encoding]$Encoding) {
     [IO.File]::WriteAllText($Path, $Content + [Environment]::NewLine, $Encoding)
 }
 
-foreach ($file in @($bridge, $hostProgram)) {
-    if (!(Test-Path -LiteralPath $file -PathType Leaf)) { throw ('请先构建：' + $file) }
+function Export-ConfiguredHost {
+    $archive = Join-Path $folder "WindowsStream-$name-host.zip"
+    $pending = Join-Path $folder ('.windowsstream-' + [Guid]::NewGuid().ToString('N') + '.zip')
+    try {
+        Compress-Archive -LiteralPath (@($hostProgram) + $hostConfig) -DestinationPath $pending
+        if (Test-Path -LiteralPath $archive -PathType Leaf) {
+            [IO.File]::Replace($pending, $archive, [NullString]::Value)
+        } else {
+            [IO.File]::Move($pending, $archive)
+        }
+    } finally {
+        if (Test-Path -LiteralPath $pending -PathType Leaf) { [IO.File]::Delete($pending) }
+    }
 }
+
+if (!(Test-Path -LiteralPath $hostProgram -PathType Leaf)) { throw ('请先构建：' + $hostProgram) }
+$existing = @($hostConfig | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
+if ($existing.Count -eq $hostConfig.Count) {
+    Export-ConfiguredHost
+    Write-Output ('已沿用原配对并更新被控端包：' + $name)
+    return
+}
+$configuration = $hostConfig + @($serverConfig, (Join-Path $viewer 'relay.ini'), (Join-Path $viewer 'client.ini'))
+if ($configuration | Where-Object { Test-Path -LiteralPath $_ }) {
+    throw '已有设备的被控端配置不完整，请补齐后再打包。'
+}
+if (!(Test-Path -LiteralPath $bridge -PathType Leaf)) { throw ('请先构建：' + $bridge) }
 foreach ($dir in @($server, $hostFolder)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
-foreach ($file in @($serverConfig, (Join-Path $hostFolder 'relay.ini'), (Join-Path $hostFolder 'host.ini'),
-        (Join-Path $viewer 'relay.ini'), (Join-Path $viewer 'client.ini'))) {
-    if (Test-Path -LiteralPath $file) { throw ('中转配置已存在：' + $file) }
-}
 
 $hostKey = New-Secret
 $viewerKey = New-Secret
@@ -123,12 +144,10 @@ enabled=0
 [updates]
 enabled=0
 "@ ([Text.Encoding]::Unicode)
-Copy-Item -LiteralPath $hostProgram -Destination $hostFolder
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Open-WindowsStream.cmd') -Destination $viewer
 $launcher = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'open-controller.ps1'), $utf8)
 [IO.File]::WriteAllText((Join-Path $viewer 'open-controller.ps1'), $launcher, [Text.UTF8Encoding]::new($true))
 $launcher = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'takeover.ps1'), $utf8)
 [IO.File]::WriteAllText((Join-Path $viewer 'takeover.ps1'), $launcher, [Text.UTF8Encoding]::new($true))
-$hostFiles = foreach ($file in 'WindowsStream-Host.exe','host.ini','relay.ini') { Join-Path $hostFolder $file }
-Compress-Archive -LiteralPath $hostFiles -DestinationPath (Join-Path $folder "WindowsStream-$name-host.zip") -Force
+Export-ConfiguredHost
 Write-Output ('已生成 WindowsStream 中转被控端包和控制端配置：' + $name)

@@ -81,6 +81,8 @@ try {
     & $go build -buildvcs=false -trimpath -mod=readonly -tags hostpackage -ldflags '-H=windowsgui' -overlay $overlay -o $standalone ./cmd/host-package
     if ($LASTEXITCODE -ne 0) { throw '被控端启动程序构建失败。' }
 } finally { Pop-Location }
+$oldLauncher = Join-Path $hostOutput 'WindowsStream-RelayHost.exe'
+if (Test-Path -LiteralPath $oldLauncher -PathType Leaf) { [IO.File]::Delete($oldLauncher) }
 foreach ($folder in @($controllerRuntime, (Join-Path $hostOutput '.runtime'))) {
     $runtime = Get-Item -LiteralPath $folder -Force -ErrorAction SilentlyContinue
     if ($runtime) { $runtime.Attributes = $runtime.Attributes -bor [IO.FileAttributes]::Hidden }

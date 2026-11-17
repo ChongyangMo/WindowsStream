@@ -135,7 +135,7 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="WindowsStream.targets" />
-  <Target Name="BuildPortableRelayHost" AfterTargets="CopyPortableFiles"
+  <Target Name="BuildPortableHost" AfterTargets="CopyPortableFiles"
           Condition="'$(Configuration)'=='Release' and '$(OutDir)'=='$(ReleaseDirectory)\host\.runtime\'">
     <Exec Command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(WindowsRoot)tools\relay\prepare-universal.ps1&quot; -Release &quot;$(ReleaseDirectory)&quot; -HostProgram &quot;$(TargetPath)&quot;" />
   </Target>
