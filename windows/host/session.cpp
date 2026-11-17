@@ -18,7 +18,7 @@ std::string AverageMicros(uint64_t elapsed, uint64_t samples) {
 }
 
 bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
-           HWND owner, std::atomic<bool>& running, bool& gpuRecovered) {
+           HWND owner, std::atomic<bool>& running, std::atomic<unsigned>& progress, bool& gpuRecovered) {
     CursorSender cursor;
     const auto description = stream.Description();
     LogLine("视频链路：%s", description.c_str());
@@ -94,6 +94,7 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
         return true;
     };
     while (running && connected) {
+        progress.fetch_add(1, std::memory_order_relaxed);
         if (gpuBack) {
             gpuRecovered = true;
             LogLine("GPU 桌面复制已恢复，重建连接切回 GPU 采集");
@@ -197,6 +198,7 @@ void HostServer::Run(const HostConfig& config, HWND owner, const std::function<v
         HostConfig activeConfig = config;
         servermode::DesktopBinding desktop;
         while (running_) {
+            progress_.fetch_add(1, std::memory_order_relaxed);
             if (!desktop.Attach()) {
                 LogLine("服务器桌面切换暂未完成，重新启动会话代理：%lu", GetLastError());
                 return;
@@ -212,7 +214,8 @@ void HostServer::Run(const HostConfig& config, HWND owner, const std::function<v
             auto channel = std::make_shared<HostChannel>();
             status(config.reverse ? L"正在连接" : L"等待连接");
             unsigned failures = 0;
-            while (running_ && !channel->Open(config, Locator().Current(), running_)) {
+            while (running_ && !channel->Open(config, Locator().Current(), running_, progress_)) {
+                progress_.fetch_add(1, std::memory_order_relaxed);
                 // 连续三次连不上就在网线链路上寻找控制端的当前地址。
                 if (config.reverse && ++failures >= 3) Locator().Find(running_);
                 for (int i = 0; i < 10 && running_; ++i) Sleep(100);
@@ -232,7 +235,7 @@ void HostServer::Run(const HostConfig& config, HWND owner, const std::function<v
                 LogLine("控制端已通过认证：%s", WideToUtf8(Locator().Current()).c_str());
                 if (config.reverse) Locator().Succeeded();
                 bool gpuRecovered = false;
-                if (Serve(*channel, stream, activeConfig, owner, running_, gpuRecovered) && config.encoder == L"auto") {
+                if (Serve(*channel, stream, activeConfig, owner, running_, progress_, gpuRecovered) && config.encoder == L"auto") {
                     if (activeConfig.encoder != L"software") {
                         activeConfig.encoder = L"software";
                         LogLine("硬件视频路径运行失败，下一次连接改用 GPU 采集和系统软件编码");

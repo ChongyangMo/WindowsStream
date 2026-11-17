@@ -17,21 +17,28 @@ bool HostRuntime::Awake(bool enabled) {
 void HostRuntime::Save(const wchar_t* key, bool enabled) {
     if (!WritePrivateProfileStringW(L"background", key, enabled ? L"1" : L"0", ini_.c_str())) LogLine("保存后台运行配置失败：%lu", GetLastError());
 }
-void HostRuntime::Start(HWND window, const HostConfig& config, bool background, int show, const std::function<void()>& quit) {
-    window_ = window; config_ = config; quit_ = quit;
+void HostRuntime::Start(HWND window, const HostConfig& config, bool background, int show, const std::function<void()>& quit,
+                        const std::function<unsigned()>& workerProgress) {
+    window_ = window; config_ = config; quit_ = quit; workerProgress_ = workerProgress;
     ini_ = PortableDir() + L"\\host.ini";
     taskbarCreated_ = RegisterWindowMessageW(L"TaskbarCreated");
+    const bool guardReady = !config_.watchdog || guard_.Start();
     if (!SetUserAutoStart(config_.autoStart)) config_.autoStart = false;
     if (config_.keepAwake && !Awake(true)) config_.keepAwake = false;
     if (!config_.keepAwake) RestoreDormantScreenSaver(PortableDir());
     power_.Start(window_);
-    if (config_.watchdog && !guard_.Start()) { config_.watchdog = false; LogLine("启动异常退出守护失败：%lu", GetLastError()); }
     const bool hidden = config_.tray && tray_.Add(window_) && background;
     ShowWindow(window_, hidden ? SW_HIDE : show == SW_HIDE ? SW_SHOWNOACTIVATE : show);
     LogLine("托盘常驻：%s；登录自启 %s，保持唤醒 %s，异常恢复 %s", tray_.Added() ? "已启用" : "未启用",
-        config_.autoStart ? "开" : "关", config_.keepAwake ? "开" : "关", config_.watchdog ? "开" : "关");
+        config_.autoStart ? "开" : "关", config_.keepAwake ? "开" : "关", config_.watchdog ? (guardReady ? "开" : "等待重试") : "关");
 }
-void HostRuntime::Stop() { power_.Stop(); idle_.Stop(); KillTimer(window_, 30); awake_.Release(updateHandoff_); guard_.Stop(); tray_.Remove(); }
+void HostRuntime::Stop() { guard_.Stop(); power_.Stop(); idle_.Stop(); KillTimer(window_, 30); awake_.Release(updateHandoff_); tray_.Remove(); }
+void HostRuntime::WatchdogTick() {
+    if (endingSession_ || (!config_.watchdog && !config_.keepAwake)) return;
+    const auto current = workerProgress_();
+    guard_.Pulse(current != lastWorkerProgress_);
+    lastWorkerProgress_ = current;
+}
 void HostRuntime::Show() { ShowWindow(window_, SW_RESTORE); SetForegroundWindow(window_); }
 void HostRuntime::Status(const std::wstring& status) { status_ = status; tray_.Status(status_); }
 void HostRuntime::Exit(const char* reason) {
@@ -55,7 +62,7 @@ bool HostRuntime::Handle(UINT message, WPARAM wParam, LPARAM lParam, LRESULT& re
         case WM_TIMER:
             if (wParam == 30) { awake_.Refresh(); return true; }
             if (wParam == kIdlePulseTimer) { idle_.Tick(); return true; }
-            if (wParam == kPowerWatchTimer) { power_.Tick(); return true; }
+            if (wParam == kPowerWatchTimer) { WatchdogTick(); power_.Tick(); return true; }
             break;
         case WM_SYSCOMMAND:
             if (config_.keepAwake && ((wParam & 0xFFF0) == SC_SCREENSAVE || (wParam & 0xFFF0) == SC_MONITORPOWER)) return true;
@@ -89,10 +96,12 @@ bool HostRuntime::Handle(UINT message, WPARAM wParam, LPARAM lParam, LRESULT& re
             }
             break;
         case WM_QUERYENDSESSION:
-            idle_.Stop(); KillTimer(window_, 30); awake_.Release(); guard_.Stop(); result = TRUE; return true;
+            endingSession_ = true;
+            guard_.Stop(); idle_.Stop(); KillTimer(window_, 30); awake_.Release(); result = TRUE; return true;
         case WM_ENDSESSION:
             if (wParam) Exit("系统注销或关机");
             else {
+                endingSession_ = false;
                 if (config_.watchdog && !guard_.Start()) LogLine("取消注销后恢复守护失败");
                 if (config_.keepAwake) Awake(true);
             }

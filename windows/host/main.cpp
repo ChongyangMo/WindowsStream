@@ -92,13 +92,16 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     if (serverResult >= 0) return serverResult;
     int argumentCount = 0;
     auto arguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount);
-    if (arguments && argumentCount == 6 && std::wstring(arguments[1]) == L"--watchdog") {
+    if (arguments && argumentCount >= 2 && std::wstring(arguments[1]) == L"--watchdog") {
+        if (argumentCount != 8) { LocalFree(arguments); return 2; }
         const DWORD parent = wcstoul(arguments[2], nullptr, 10);
         const auto created = _wcstoui64(arguments[3], nullptr, 10);
         const auto parentHandle = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(_wcstoui64(arguments[4], nullptr, 10)));
         const auto stopHandle = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(_wcstoui64(arguments[5], nullptr, 10)));
+        const auto uiBeat = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(_wcstoui64(arguments[6], nullptr, 10)));
+        const auto workerBeat = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(_wcstoui64(arguments[7], nullptr, 10)));
         LocalFree(arguments);
-        return RunRecovery(parent, created, parentHandle, stopHandle);
+        return RunRecovery(parent, created, parentHandle, stopHandle, uiBeat, workerBeat);
     }
     if (arguments && argumentCount == 3 && std::wstring(arguments[1]) == L"--apply-update") {
         const auto ticket = std::wstring(arguments[2]); LocalFree(arguments);
@@ -146,7 +149,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
                                 nullptr, nullptr, instance, &config);
     if (!window) { WSACleanup(); CloseHandle(single); return 1; }
     runtime.Start(window, config, background || (updated && config.startHidden), show,
-                  [window] { server.Stop(); DestroyWindow(window); });
+                  [window] { server.Stop(); DestroyWindow(window); }, [] { return server.Progress(); });
     LogLine("Windows 被控端启动，模式：%s", config.reverse ? "主动连接控制端" : "等待控制端连接");
     HostUpdateClient updateClient;
     updateClient.Start(config, bootId);

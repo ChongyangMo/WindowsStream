@@ -9,7 +9,8 @@
 
 class HostRuntime {
 public:
-    void Start(HWND window, const HostConfig& config, bool background, int show, const std::function<void()>& quit);
+    void Start(HWND window, const HostConfig& config, bool background, int show, const std::function<void()>& quit,
+               const std::function<unsigned()>& workerProgress);
     void Stop();
     bool Handle(UINT message, WPARAM wParam, LPARAM lParam, LRESULT& result);
     void Status(const std::wstring& status);
@@ -18,6 +19,7 @@ private:
     void Show();
     bool Awake(bool enabled);
     void Save(const wchar_t* key, bool enabled);
+    void WatchdogTick();
     HWND window_ = nullptr;
     HostConfig config_;
     HostTray tray_;
@@ -27,7 +29,10 @@ private:
     PowerWatch power_;
     std::wstring ini_, status_ = L"正在启动";
     std::function<void()> quit_;
+    std::function<unsigned()> workerProgress_;
+    unsigned lastWorkerProgress_ = 0;
     UINT taskbarCreated_ = 0;
     bool exiting_ = false;
+    bool endingSession_ = false;
     bool updateHandoff_ = false;
 };

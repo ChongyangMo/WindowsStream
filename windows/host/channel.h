@@ -6,7 +6,8 @@ class HostChannel {
 public:
     ~HostChannel();
     // controller 为反向模式当前要连接的控制端地址。
-    bool Open(const HostConfig& config, const std::wstring& controller, std::atomic<bool>& running);
+    bool Open(const HostConfig& config, const std::wstring& controller, std::atomic<bool>& running,
+              std::atomic<unsigned>& progress);
     bool Authenticate(const std::string& token, int width, int height, int fps);
     bool Read(uint8_t& type, std::vector<uint8_t>& payload);
     bool Send(uint8_t type, const Writer& payload);

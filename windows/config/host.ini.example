@@ -28,6 +28,7 @@ tray = 1
 start_hidden = 1
 keep_awake = 1
 watchdog = 1
+watchdog_timeout_seconds = 120
 idle_pulse = 1
 idle_seconds = 120
 

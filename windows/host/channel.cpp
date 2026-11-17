@@ -31,7 +31,8 @@ std::wstring HostChannel::LocalAddress() const {
     return text;
 }
 
-bool HostChannel::Open(const HostConfig& config, const std::wstring& controller, std::atomic<bool>& running) {
+bool HostChannel::Open(const HostConfig& config, const std::wstring& controller, std::atomic<bool>& running,
+                       std::atomic<unsigned>& progress) {
     sockaddr_in address{};
     address.sin_family = AF_INET;
     address.sin_port = htons(config.port);
@@ -77,6 +78,7 @@ bool HostChannel::Open(const HostConfig& config, const std::wstring& controller,
             }
         }
         while (running) {
+            progress.fetch_add(1, std::memory_order_relaxed);
             fd_set readable;
             FD_ZERO(&readable); FD_SET(listener_, &readable);
             timeval wait{0, 250000};

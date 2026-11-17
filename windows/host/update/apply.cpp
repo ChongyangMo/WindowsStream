@@ -61,6 +61,8 @@ int Apply(const std::wstring& ticketText) {
         !LoadPackage(payload, next) || !LoadPackage(module, helper) || !LoadPackage(target, old) || next.bytes.size() != length ||
         next.stamp != stamp || stamp <= old.stamp || !SecureEqual(next.hash.data(), hash.data(), 32) ||
         !SecureEqual(helper.hash.data(), hash.data(), 32) || !parentId || !expectedCreation) return 3;
+    const HostUpdateLock updateLock(5000);
+    if (!updateLock) return 9;
     const auto digest = Hex(hash.data(), hash.size());
     HANDLE parent = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE, FALSE, parentId);
     if (parent) {
