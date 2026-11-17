@@ -15,7 +15,8 @@ $root = Join-Path (Split-Path -Parent $releaseRoot) 'obj/relay/universal'
 $hostFolder = Join-Path $root 'host'
 $server = Join-Path $root 'server'
 $controller = Join-Path $releaseRoot 'controller'
-foreach ($folder in @($hostFolder, $server, $controller, $hostOutput)) {
+$controllerRuntime = Join-Path $controller '.runtime'
+foreach ($folder in @($hostFolder, $server, $controllerRuntime, $hostOutput)) {
     $null = New-Item -ItemType Directory -Path $folder -Force
 }
 
@@ -56,17 +57,17 @@ function Copy-Launcher([string]$Name, [string]$Folder) {
 
 Copy-Item -LiteralPath $hostProgram -Destination $hostFolder -Force
 Copy-Item -LiteralPath $bridgeProgram -Destination (Join-Path $hostFolder 'WindowsStreamBridge.exe') -Force
-Copy-Item -LiteralPath $bridgeProgram -Destination (Join-Path $controller 'WindowsStreamBridge.exe') -Force
+Copy-Item -LiteralPath $bridgeProgram -Destination (Join-Path $controllerRuntime 'WindowsStreamBridge.exe') -Force
 
 foreach ($launcher in @('takeover.ps1','pairing.ps1')) {
     Copy-Launcher $launcher $hostFolder
-    Copy-Launcher $launcher $controller
+    Copy-Launcher $launcher $controllerRuntime
 }
 Copy-Launcher 'start-host.ps1' $hostFolder
-Copy-Launcher 'connect-universal.ps1' $controller
+Copy-Launcher 'connect-universal.ps1' $controllerRuntime
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'host.ini.template') -Destination $hostFolder -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Connect-WindowsStream.cmd') -Destination $controller -Force
-$network = Join-Path $controller 'relay-network.ini'
+$network = Join-Path $controllerRuntime 'relay-network.ini'
 if (!(Test-Path -LiteralPath $network)) {
     Write-RelayIni $network @"
 [relay]
@@ -89,6 +90,8 @@ try {
     & $go build -buildvcs=false -trimpath -mod=readonly -tags hostpackage -ldflags '-H=windowsgui' -overlay $overlay -o $standalone ./cmd/host-package
     if ($LASTEXITCODE -ne 0) { throw '通用被控端启动程序构建失败。' }
 } finally { Pop-Location }
-$runtime = Get-Item -LiteralPath (Join-Path $hostOutput '.runtime') -Force -ErrorAction SilentlyContinue
-if ($runtime) { $runtime.Attributes = $runtime.Attributes -bor [IO.FileAttributes]::Hidden }
+foreach ($folder in @($controllerRuntime, (Join-Path $hostOutput '.runtime'))) {
+    $runtime = Get-Item -LiteralPath $folder -Force -ErrorAction SilentlyContinue
+    if ($runtime) { $runtime.Attributes = $runtime.Attributes -bor [IO.FileAttributes]::Hidden }
+}
 Write-Output '已生成通用被控端和控制端配对入口。'

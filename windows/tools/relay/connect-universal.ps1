@@ -14,7 +14,8 @@ try {
             $PairFile = $picker.FileName
         } finally { $picker.Dispose() }
     }
-    $controller = Join-Path $PSScriptRoot 'WindowsStream.exe'
+    $controllerFolder = Split-Path -Parent $PSScriptRoot
+    $controller = Join-Path $controllerFolder 'WindowsStream.exe'
     $source = Join-Path $PSScriptRoot 'WindowsStreamBridge.exe'
     $networkFile = Join-Path $PSScriptRoot 'relay-network.ini'
     Assert-StreamFiles @($controller, $source, $PairFile, $networkFile)
@@ -26,7 +27,7 @@ try {
     $network = Read-RelaySection $networkFile 'relay'
 
     Invoke-StreamLock 'Local\WindowsStreamControllerLaunch' {
-        $store = Join-Path $PSScriptRoot 'relay-devices'
+        $store = Join-Path $controllerFolder 'relay-devices'
         $folder = Join-Path $store $pair.device
         $profile = Join-Path $folder 'client.ini'
         $bridge = Join-Path $folder 'WindowsStreamBridge.exe'
@@ -83,12 +84,12 @@ enabled=0
 "@ ([Text.Encoding]::Unicode)
             Start-Process -FilePath $bridge -WorkingDirectory $folder -WindowStyle Hidden
         }
-        $workspace = Start-Process -FilePath $controller -WorkingDirectory $PSScriptRoot -PassThru
+        $workspace = Start-Process -FilePath $controller -WorkingDirectory $controllerFolder -PassThru
         try { $null = $workspace.WaitForInputIdle(8000) }
         catch [InvalidOperationException] { if (!$workspace.HasExited) { throw } }
         catch [ComponentModel.Win32Exception] { if (!$workspace.HasExited) { throw } }
         finally { $workspace.Dispose() }
-        Start-Process -FilePath $controller -WorkingDirectory $PSScriptRoot -ArgumentList @('--profile', ('"' + $profile + '"'))
+        Start-Process -FilePath $controller -WorkingDirectory $controllerFolder -ArgumentList @('--profile', ('"' + $profile + '"'))
     }
 } catch {
     Add-Type -AssemblyName PresentationFramework
