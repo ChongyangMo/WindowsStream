@@ -63,6 +63,13 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
                     break;
                 default:
                     if (!fileDrag.Handle(type, payload, input)) input.Handle(type, payload);
+                    if (const auto error = input.TakeFailureNotice()) {
+                        const auto message = "系统未接受键鼠操作，错误码 " + std::to_string(*error);
+                        LogLine("%s", message.c_str());
+                        Writer notice;
+                        notice.append(message.data(), message.size());
+                        if (!channel.Send(MsgHostInfo, notice)) connected = false;
+                    }
                     break;
             }
         }

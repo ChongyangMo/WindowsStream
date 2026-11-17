@@ -1,22 +1,27 @@
 #pragma once
 #include "../src/common.h"
+#include <optional>
 #include <set>
+#include <utility>
 #include "service/service.h"
 
 class InputInjector {
 public:
     ~InputInjector();
     bool Handle(uint8_t type, const std::vector<uint8_t>& payload);
+    std::optional<DWORD> TakeFailureNotice() { return std::exchange(failureNotice_, std::nullopt); }
     void ReleaseAll();
     bool CanHandOffDrag() const { return buttons_.size() == 1 && buttons_.count(0) && !keys_.count(1); }
     bool FinishFileDrag();
 private:
-    bool Submit(INPUT input);
+    bool Submit(INPUT* inputs, UINT count);
+    bool Submit(INPUT input) { return Submit(&input, 1); }
     bool Move(uint16_t x, uint16_t y);
     bool Key(uint16_t code, bool down);
-    bool Button(uint8_t button, bool down);
+    bool Button(uint8_t button, bool down, const INPUT* position = nullptr);
     std::set<uint16_t> keys_;
     std::set<uint8_t> buttons_;
     uint64_t lastFailure_ = 0;
+    std::optional<DWORD> failureNotice_;
     servermode::DesktopBinding desktop_;
 };

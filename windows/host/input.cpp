@@ -8,29 +8,37 @@ bool InputInjector::FinishFileDrag() {
     return Button(0, false) && escaped;
 }
 
-bool InputInjector::Submit(INPUT input) {
-    if (servermode::SecureAgent() && !desktop_.Attach()) return false;
-    if (SendInput(1, &input, sizeof input) == 1) return true;
+bool InputInjector::Submit(INPUT* inputs, UINT count) {
+    SetLastError(ERROR_SUCCESS);
+    if ((!servermode::SecureAgent() || desktop_.Attach()) && SendInput(count, inputs, sizeof(INPUT)) == count)
+        return true;
+    const DWORD error = GetLastError();
     const auto now = NowMicros();
-    if (now - lastFailure_ > 2000000) {
-        LogLine("系统未接受键鼠操作：%lu；请确认目标窗口没有以管理员身份运行", GetLastError());
+    if (!lastFailure_ || now - lastFailure_ >= 2000000) {
+        failureNotice_ = error;
         lastFailure_ = now;
     }
     return false;
 }
 
-bool InputInjector::Move(uint16_t x, uint16_t y) {
+namespace {
+bool MousePosition(uint16_t x, uint16_t y, INPUT& input) {
     const int virtualWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN);
     const int virtualHeight = GetSystemMetrics(SM_CYVIRTUALSCREEN);
     if (virtualWidth < 2 || virtualHeight < 2) return false;
     const int px = static_cast<int>(static_cast<int64_t>(x) * (GetSystemMetrics(SM_CXSCREEN) - 1) / 65535);
     const int py = static_cast<int>(static_cast<int64_t>(y) * (GetSystemMetrics(SM_CYSCREEN) - 1) / 65535);
-    INPUT input{};
     input.type = INPUT_MOUSE;
     input.mi.dx = static_cast<LONG>(static_cast<int64_t>(px - GetSystemMetrics(SM_XVIRTUALSCREEN)) * 65535 / (virtualWidth - 1));
     input.mi.dy = static_cast<LONG>(static_cast<int64_t>(py - GetSystemMetrics(SM_YVIRTUALSCREEN)) * 65535 / (virtualHeight - 1));
     input.mi.dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK;
-    return Submit(input);
+    return true;
+}
+}
+
+bool InputInjector::Move(uint16_t x, uint16_t y) {
+    INPUT position{};
+    return MousePosition(x, y, position) && Submit(position);
 }
 
 bool InputInjector::Key(uint16_t code, bool down) {
@@ -50,18 +58,25 @@ bool InputInjector::Key(uint16_t code, bool down) {
     return true;
 }
 
-bool InputInjector::Button(uint8_t button, bool down) {
+bool InputInjector::Button(uint8_t button, bool down, const INPUT* position) {
     static constexpr DWORD flags[5][2] = {
         {MOUSEEVENTF_LEFTUP, MOUSEEVENTF_LEFTDOWN}, {MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_RIGHTDOWN},
         {MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_MIDDLEDOWN}, {MOUSEEVENTF_XUP, MOUSEEVENTF_XDOWN},
         {MOUSEEVENTF_XUP, MOUSEEVENTF_XDOWN}
     };
     if (button >= 5) return false;
-    INPUT input{};
+    INPUT events[2]{};
+    auto& input = events[1];
     input.type = INPUT_MOUSE;
     input.mi.dwFlags = flags[button][down ? 1 : 0];
     if (button >= 3) input.mi.mouseData = button == 3 ? XBUTTON1 : XBUTTON2;
-    if (!Submit(input)) return false;
+    if (position) {
+        // 在同一批提交定位和按键，避免被控机本地移动插在两次操作之间。
+        events[0] = *position;
+        if (!Submit(events, 2) && (down || !Submit(input))) return false;
+    } else if (!Submit(input)) {
+        return false;
+    }
     if (down) buttons_.insert(button);
     else buttons_.erase(button);
     return true;
@@ -71,9 +86,15 @@ bool InputInjector::Handle(uint8_t type, const std::vector<uint8_t>& payload) {
     switch (type) {
         case MsgMouseMove:
             return payload.size() == 4 && Move(ReadU16(payload.data()), ReadU16(payload.data() + 2));
-        case MsgMouseButton:
-            return payload.size() == 6 && payload[0] < 5 && payload[1] < 2 &&
-                   Move(ReadU16(payload.data() + 2), ReadU16(payload.data() + 4)) && Button(payload[0], payload[1] != 0);
+        case MsgMouseButton: {
+            if (payload.size() != 6 || payload[0] >= 5 || payload[1] >= 2) return false;
+            const bool down = payload[1] != 0;
+            INPUT position{};
+            if (MousePosition(ReadU16(payload.data() + 2), ReadU16(payload.data() + 4), position))
+                return Button(payload[0], down, &position);
+            // 屏幕状态变化导致定位不可用时，仍尝试松开已按下的鼠标键。
+            return !down && buttons_.count(payload[0]) && Button(payload[0], false);
+        }
         case MsgKey:
             return payload.size() == 3 && payload[2] < 2 && Key(ReadU16(payload.data()), payload[2] != 0);
         case MsgReleaseAll:
