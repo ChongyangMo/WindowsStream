@@ -5,6 +5,9 @@
 namespace filedrag {
 constexpr uint16_t kMaxFiles = 256;
 constexpr uint32_t kReadSize = 512 * 1024;
+constexpr uint32_t kUploadBlockSize = 128 * 1024;
+constexpr size_t kUploadDataHeader = 14;  // u32 批次、u16 文件序号、u64 偏移
+enum class UploadStatus : uint8_t { Accepted, Complete, Failed };
 
 struct File {
     std::wstring name;

@@ -6,6 +6,7 @@
 #include "input.h"
 #include "discovery.h"
 #include "file_drag/sender.h"
+#include "file_drag/receiver.h"
 #include "locate/locator.h"
 #include "service/service.h"
 #include <cstdio>
@@ -31,7 +32,8 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
     if (!channel.Send(MsgTelemetry, initialTelemetry)) return false;
     ClipboardBridge clipboard(owner);
     filedrag::Sender fileDrag(channel);
-    if (config.fileDrag && !servermode::SecureAgent() && !fileDrag.Start()) return false;
+    filedrag::Receiver fileReceiver(channel);
+    if (config.fileDrag && !servermode::SecureAgent() && (!fileDrag.Start() || !fileReceiver.Start())) return false;
     const bool allowExclusiveMouse = config.exclusiveMouse && !servermode::SecureAgent();
     const auto sendMouseState = [&](ExclusiveMouseState state, DWORD error = ERROR_SUCCESS) {
         Writer status;
@@ -94,7 +96,7 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
                     // 首版按被控端真实主屏和配置输出，不修改分辨率或创建虚拟屏。
                     break;
                 default:
-                    if (!fileDrag.Handle(type, payload, input)) input.Handle(type, payload);
+                    if (!fileReceiver.Handle(type, payload) && !fileDrag.Handle(type, payload, input)) input.Handle(type, payload);
                     if (const auto error = input.TakeFailureNotice()) {
                         const auto message = "系统未接受键鼠操作，错误码 " + std::to_string(*error);
                         LogLine("%s", message.c_str());

@@ -48,6 +48,11 @@ enum MessageType : uint8_t {
     MsgFileDragData = 64,
     MsgFileDragClose = 65,
     MsgFileDragAccept = 66,
+    MsgFileUploadAvailable = 67,
+    MsgFileUploadOffer = 68,
+    MsgFileUploadData = 69,
+    MsgFileUploadCancel = 70,
+    MsgFileUploadResult = 71,
 };
 
 enum class ExclusiveMouseState : uint8_t { Unavailable, Available, Active, Failed };

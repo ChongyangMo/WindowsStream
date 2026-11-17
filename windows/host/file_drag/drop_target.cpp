@@ -1,6 +1,5 @@
 #include "capture.h"
-#include "../../shared/file_drag.h"
-#include <shellapi.h>
+#include "../../shared/file_drag_source.h"
 #include <wrl/implements.h>
 #include <chrono>
 #include <condition_variable>
@@ -12,29 +11,6 @@ constexpr UINT kShow = WM_APP + 1;
 constexpr UINT kHide = WM_APP + 2;
 constexpr std::wstring_view kWindowClass = L"WindowsStream.FileDragTarget";
 
-std::vector<std::wstring> PathsFromDrop(IDataObject* data) {
-    FORMATETC format{CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
-    STGMEDIUM medium{};
-    if (FAILED(data->GetData(&format, &medium))) return {};
-    std::vector<std::wstring> paths;
-    if (medium.tymed == TYMED_HGLOBAL && medium.hGlobal) {
-        const auto drop = reinterpret_cast<HDROP>(medium.hGlobal);
-        const UINT count = DragQueryFileW(drop, 0xffffffff, nullptr, 0);
-        if (count <= kMaxFiles) {
-            for (UINT i = 0; i < count; ++i) {
-                const UINT length = DragQueryFileW(drop, i, nullptr, 0);
-                if (!length || length >= 32767) break;
-                std::wstring path(length + 1, L'\0');
-                if (DragQueryFileW(drop, i, path.data(), length + 1) != length) break;
-                path.resize(length);
-                paths.push_back(std::move(path));
-            }
-        }
-        if (paths.size() != count) paths.clear();
-    }
-    ReleaseStgMedium(&medium);
-    return paths;
-}
 }
 
 struct Capture::Request {

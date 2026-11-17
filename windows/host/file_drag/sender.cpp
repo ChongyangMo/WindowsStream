@@ -38,30 +38,6 @@ bool Sender::Handle(uint8_t type, const std::vector<uint8_t>& payload, InputInje
     }
 }
 
-std::vector<Sender::Source> Sender::OpenFiles(const std::vector<std::wstring>& paths) {
-    std::vector<Source> files;
-    files.reserve(paths.size());
-    for (const auto& path : paths) {
-        const auto slash = path.find_last_of(L"\\/");
-        if (slash == std::wstring::npos) return {};
-        auto name = path.substr(slash + 1);
-        if (!ValidName(name)) return {};
-        const auto raw = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE,
-            nullptr, OPEN_EXISTING, FILE_FLAG_RANDOM_ACCESS, nullptr);
-        if (raw == INVALID_HANDLE_VALUE) return {};
-        Source source;
-        source.handle.reset(raw);
-        BY_HANDLE_FILE_INFORMATION info{};
-        if (GetFileType(raw) != FILE_TYPE_DISK || !GetFileInformationByHandle(raw, &info) ||
-            (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) return {};
-        source.file = {std::move(name),
-            (static_cast<uint64_t>(info.nFileSizeHigh) << 32) | info.nFileSizeLow,
-            (static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime) << 32) | info.ftLastWriteTime.dwLowDateTime};
-        files.push_back(std::move(source));
-    }
-    return files;
-}
-
 void Sender::Probe(uint32_t id, InputInjector& input) {
     std::vector<Source> files;
     if (input.CanHandOffDrag() && offers_.size() < 8 && !offers_.contains(id) && servermode::DesktopAccessible()) {
@@ -96,13 +72,8 @@ void Sender::Read(const std::vector<uint8_t>& payload) {
     if (offer != offers_.end() && offer->second.accepted && index < offer->second.files.size() && length && length <= kReadSize) {
         const auto& source = offer->second.files[index];
         if (offset < source.file.size && length <= source.file.size - offset) {
-            LARGE_INTEGER position{};
-            position.QuadPart = static_cast<LONGLONG>(offset);
-            DWORD received = 0;
             response.bytes.resize(5 + length);
-            const auto handle = source.handle.get();
-            if (SetFilePointerEx(handle, position, nullptr, FILE_BEGIN) &&
-                ReadFile(handle, response.bytes.data() + 5, length, &received, nullptr) && received == length) {
+            if (source.Read(offset, response.bytes.data() + 5, length)) {
                 response.bytes[4] = 1;
             } else {
                 response.bytes.resize(5);
