@@ -1,4 +1,4 @@
-function New-RelayKey {
+﻿function New-RelayKey {
     $bytes = [byte[]]::new(32)
     $random = [Security.Cryptography.RandomNumberGenerator]::Create()
     try { $random.GetBytes($bytes) }

@@ -19,7 +19,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
-    <ArtifactDirectory>vm-browser</ArtifactDirectory>
+    <ArtifactDirectory>controller\.vm-browser</ArtifactDirectory>
     <ApplicationSubsystem>Console</ApplicationSubsystem>
   </PropertyGroup>
   <Import Project="WindowsStream.props" />

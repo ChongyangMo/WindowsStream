@@ -4,7 +4,8 @@
 )
 $ErrorActionPreference = 'Stop'
 $windowsRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$outputDirectory = Join-Path $windowsRoot "build\$Configuration\controller"
+$output = if ($Configuration -eq 'Debug') { '1debug' } else { '2release' }
+$outputDirectory = Join-Path $windowsRoot "build\$output\controller"
 $outputFile = Join-Path $outputDirectory 'WindowsStreamTunnel.exe'
 
 try {

@@ -2,7 +2,11 @@ $ErrorActionPreference = 'Stop'
 try {
     . (Join-Path $PSScriptRoot 'takeover.ps1')
     $bridge = Join-Path $PSScriptRoot 'WindowsStreamBridge.exe'
-    $controller = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..\..\controller\WindowsStream.exe')).Path
+    $controller = @(foreach ($relative in @('..\..\WindowsStream.exe','..\..\..\..\2release\controller\WindowsStream.exe')) {
+        $candidate = Join-Path $PSScriptRoot $relative
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) { (Resolve-Path -LiteralPath $candidate).Path }
+    }) | Select-Object -First 1
+    if (!$controller) { throw '找不到正式版 WindowsStream 控制端。' }
     $controllerFolder = Split-Path -Parent $controller
     $profile = Join-Path $PSScriptRoot 'client.ini'
     Assert-StreamFiles @($bridge, $profile, (Join-Path $PSScriptRoot 'relay.ini'), (Join-Path $controllerFolder 'client.ini'))

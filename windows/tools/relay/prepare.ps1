@@ -10,12 +10,12 @@ if ($address.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork) { thro
 $key = $address.ToString().Replace('.', '-')
 $name = $address.ToString()
 $releaseRoot = [IO.Path]::GetFullPath($Release)
-$folder = Join-Path $releaseRoot "relay/$key"
+$folder = Join-Path (Split-Path -Parent $releaseRoot) "obj/relay/$key"
 $server = Join-Path $folder 'server'
 $viewer = Join-Path $folder 'controller'
 $hostFolder = Join-Path $folder 'host'
 $bridge = Join-Path $viewer 'WindowsStreamBridge.exe'
-$hostProgram = Join-Path $releaseRoot 'host/WindowsStreamHost.exe'
+$hostProgram = Join-Path $releaseRoot 'host/.runtime/WindowsStreamHost.exe'
 $serverConfig = Join-Path $server 'windowsstream-relay.ini'
 $endpoint = 'wss://sdserver.luxvisions-inno.com/api/windowsstream/relay'
 $target = '10.18.32.67:443'

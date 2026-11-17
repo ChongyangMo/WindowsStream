@@ -2,7 +2,10 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <WindowsRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\'))</WindowsRoot>
-    <OutDir>$(WindowsRoot)build\$(Configuration)\$(ArtifactDirectory)\</OutDir>
+    <ReleaseDirectory>$(WindowsRoot)build\2release</ReleaseDirectory>
+    <OutputDirectory Condition="'$(Configuration)'=='Debug'">$(WindowsRoot)build\1debug</OutputDirectory>
+    <OutputDirectory Condition="'$(Configuration)'=='Release'">$(ReleaseDirectory)</OutputDirectory>
+    <OutDir>$(OutputDirectory)\$(ArtifactDirectory)\</OutDir>
     <IntDir>$(WindowsRoot)build\obj\$(Configuration)\$(MSBuildProjectName)\</IntDir>
     <LinkIncremental>false</LinkIncremental>
     <LocalDebuggerWorkingDirectory>$(OutDir)</LocalDebuggerWorkingDirectory>
@@ -34,6 +37,7 @@
       <SubSystem>$(ApplicationSubsystem)</SubSystem>
       <UACExecutionLevel>AsInvoker</UACExecutionLevel>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ProgramDatabaseFile>$(IntDir)$(MSBuildProjectName).pdb</ProgramDatabaseFile>
       <OptimizeReferences Condition="'$(Configuration)'=='Release'">true</OptimizeReferences>
       <EnableCOMDATFolding Condition="'$(Configuration)'=='Release'">true</EnableCOMDATFolding>
       <AdditionalDependencies>ws2_32.lib;iphlpapi.lib;bcrypt.lib;user32.lib;gdi32.lib;ole32.lib;oleaut32.lib;shell32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
