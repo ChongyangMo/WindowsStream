@@ -1,4 +1,7 @@
+param([switch]$Package)
+
 $ErrorActionPreference = 'Stop'
+if ($Package) { [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false) }
 try {
     . (Join-Path $PSScriptRoot 'takeover.ps1')
     $hostProgram = Join-Path $PSScriptRoot 'WindowsStreamHost.exe'
@@ -25,6 +28,10 @@ try {
         Start-Process -FilePath $relayProgram -WorkingDirectory $PSScriptRoot -WindowStyle Hidden
     }
 } catch {
+    if ($Package) {
+        [Console]::Error.WriteLine($_.Exception.Message)
+        exit 1
+    }
     Add-Type -AssemblyName PresentationFramework
     [void][Windows.MessageBox]::Show($_.Exception.Message, 'WindowsStream')
     exit 1
