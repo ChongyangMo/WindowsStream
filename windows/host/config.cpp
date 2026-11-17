@@ -57,6 +57,7 @@ bool LoadHostConfig(HostConfig& config, std::wstring& error) {
     config.nativeResolution = _wcsicmp(buffer, L"native") == 0;
     config.clipboard = GetPrivateProfileIntW(L"permissions", L"clipboard", 1, path.c_str()) != 0;
     config.fileDrag = GetPrivateProfileIntW(L"permissions", L"file_drag", 1, path.c_str()) != 0;
+    config.exclusiveMouse = GetPrivateProfileIntW(L"permissions", L"exclusive_mouse", 0, path.c_str()) == 1;
     config.autoStart = GetPrivateProfileIntW(L"background", L"autostart", 1, path.c_str()) != 0;
     config.manageAutoStart = GetPrivateProfileIntW(L"background", L"manage_autostart", 1, path.c_str()) != 0;
     config.tray = GetPrivateProfileIntW(L"background", L"tray", 1, path.c_str()) != 0;

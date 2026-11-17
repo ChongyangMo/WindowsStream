@@ -9,6 +9,7 @@ struct HostConfig {
     bool reverse = true;
     bool clipboard = true;
     bool fileDrag = true;
+    bool exclusiveMouse = false;
     int maxWidth = 1920;
     int maxHeight = 1080;
     bool nativeResolution = true;

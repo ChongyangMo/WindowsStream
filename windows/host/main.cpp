@@ -1,4 +1,5 @@
 #include "session.h"
+#include "exclusive_mouse.h"
 #include "update/client.h"
 #include "update/apply.h"
 #include "runtime/runtime.h"
@@ -76,6 +77,13 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             SetWindowTextW(statusLabel, status->c_str());
             runtime.Status(*status);
             if (IsWindowVisible(window)) RefreshLocalAddress(window);
+            return 0;
+        }
+        case kHostExclusiveMouseStatus: {
+            const wchar_t* status = wParam ? L"鼠标独占中 · Ctrl+Alt+F11 解除" : L"已连接";
+            SetWindowTextW(statusLabel, status);
+            runtime.Status(status);
+            LogLine("%s", wParam ? "已启用远程独占鼠标" : "已恢复现场鼠标");
             return 0;
         }
         case WM_DESTROY:

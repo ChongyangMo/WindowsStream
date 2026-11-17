@@ -35,6 +35,7 @@ constexpr UINT WM_APP_WINKEY = WM_APP + 4;     // wParam = down, lParam = 是否
 constexpr UINT WM_APP_TOGGLE_OVERLAY = WM_APP + 5;     // 切换无损层显示（Ctrl+Alt+L 或外部诊断）
 constexpr UINT WM_APP_TOGGLE_FULLSCREEN = WM_APP + 6;  // 切换全屏（外部诊断用，等同 Ctrl+Alt+Enter）
 constexpr UINT WM_APP_STREAM_SIZE = WM_APP + 7;
+constexpr UINT WM_APP_EXCLUSIVE_MOUSE_STATE = WM_APP + 9;
 constexpr UINT_PTR kTimer = 1;
 constexpr UINT_PTR kViewSizeTimer = 2;  // 窗口大小停止变化后再通知 Windows
 
@@ -434,6 +435,10 @@ void NetworkLoop() {
                 case MsgTelemetry:
                     g_diagnostics.Remote(payload);
                     break;
+                case MsgExclusiveMouseState:
+                    if (payload.size() == 5 && payload[0] <= static_cast<uint8_t>(ExclusiveMouseState::Failed))
+                        PostMessageW(g_window, WM_APP_EXCLUSIVE_MOUSE_STATE, payload[0], ReadU32(payload.data() + 1));
+                    break;
                 case MsgClipboard: {
                     auto* text = new std::wstring(Utf8ToWide(std::string(payload.begin(), payload.end())));
                     if (!PostMessageW(g_window, WM_APP_CLIPBOARD, 0, reinterpret_cast<LPARAM>(text))) {
@@ -447,6 +452,7 @@ void NetworkLoop() {
             }
         }
         g_fileDrag.Disconnect();
+        PostMessageW(g_window, WM_APP_EXCLUSIVE_MOUSE_STATE, 0, 0);
         {
             std::lock_guard lock(g_connectionMutex);
             g_connection.reset();
@@ -806,6 +812,21 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
             if (GetPrivateProfileIntW(L"permissions", L"secure_attention", 0, ConfigPath().c_str()))
                 if (const auto connection = CurrentConnection()) connection->Send(MsgSecureAttention);
             return 0;
+        case kViewerExclusiveMouse:
+            if (GetPropW(hwnd, kExclusiveMouseStateProperty)) {
+                if (const auto connection = CurrentConnection()) {
+                    const uint8_t request = wParam ? 1 : 0;
+                    if (!connection->Send(MsgExclusiveMouse, &request, sizeof request)) connection->Shutdown();
+                }
+            }
+            return 0;
+        case WM_APP_EXCLUSIVE_MOUSE_STATE:
+            if (wParam) SetPropW(hwnd, kExclusiveMouseStateProperty, reinterpret_cast<HANDLE>(wParam));
+            else RemovePropW(hwnd, kExclusiveMouseStateProperty);
+            if (static_cast<ExclusiveMouseState>(wParam) == ExclusiveMouseState::Failed)
+                LogLine("被控端无法独占鼠标，错误码 %lu", static_cast<DWORD>(lParam));
+            if (const auto parent = GetParent(hwnd)) RedrawWindow(parent, nullptr, nullptr, RDW_INVALIDATE | RDW_ALLCHILDREN);
+            return 0;
         case WM_TIMER:
             if (wParam == kViewSizeTimer) {
                 KillTimer(hwnd, kViewSizeTimer);
@@ -851,6 +872,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
             return 0;
 
         case WM_DESTROY:
+            RemovePropW(hwnd, kExclusiveMouseStateProperty);
             g_networkAccess.Stop();
             g_running = false;
             if (auto connection = CurrentConnection()) connection->Shutdown();

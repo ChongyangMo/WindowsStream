@@ -2,6 +2,7 @@
 #include "stream.h"
 #include "clipboard.h"
 #include "cursor.h"
+#include "exclusive_mouse.h"
 #include "input.h"
 #include "discovery.h"
 #include "file_drag/sender.h"
@@ -31,14 +32,45 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
     ClipboardBridge clipboard(owner);
     filedrag::Sender fileDrag(channel);
     if (config.fileDrag && !servermode::SecureAgent() && !fileDrag.Start()) return false;
+    const bool allowExclusiveMouse = config.exclusiveMouse && !servermode::SecureAgent();
+    const auto sendMouseState = [&](ExclusiveMouseState state, DWORD error = ERROR_SUCCESS) {
+        Writer status;
+        status.u8(static_cast<uint8_t>(state));
+        status.u32(error);
+        return channel.Send(MsgExclusiveMouseState, status);
+    };
+    if (allowExclusiveMouse && !sendMouseState(ExclusiveMouseState::Available)) return false;
     std::atomic<bool> connected{true};
     std::atomic<bool> forceKeyframe{true};
     std::thread receiver([&] {
         InputInjector input;
+        ExclusiveMouse exclusiveMouse;
+        bool mouseWasExclusive = false;
         uint8_t type = 0;
         std::vector<uint8_t> payload;
         while (running && connected && channel.Read(type, payload)) {
+            if (mouseWasExclusive && !exclusiveMouse.Active()) {
+                input.ReleaseAll();
+                mouseWasExclusive = false;
+                if (!sendMouseState(ExclusiveMouseState::Available)) break;
+            }
             switch (type) {
+                case MsgExclusiveMouse: {
+                    if (payload.size() != 1 || payload[0] > 1 || !allowExclusiveMouse) break;
+                    DWORD error = ERROR_SUCCESS;
+                    if (payload[0]) {
+                        error = exclusiveMouse.Start(owner);
+                    } else {
+                        if (mouseWasExclusive) input.ReleaseAll();
+                        exclusiveMouse.Stop();
+                    }
+                    mouseWasExclusive = exclusiveMouse.Active();
+                    if (error) LogLine("无法独占鼠标，错误码 %lu", error);
+                    const auto state = error ? ExclusiveMouseState::Failed : mouseWasExclusive ?
+                        ExclusiveMouseState::Active : ExclusiveMouseState::Available;
+                    if (!sendMouseState(state, error)) connected = false;
+                    break;
+                }
                 case MsgPing:
                     if (payload.size() == 8) {
                         Writer pong;
@@ -74,6 +106,7 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
             }
         }
         input.ReleaseAll();
+        exclusiveMouse.Stop();
         connected = false;
         channel.Shutdown();
     });

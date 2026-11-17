@@ -121,7 +121,11 @@ void Window::DrawTab(const DRAWITEMSTRUCT& item) {
     const HBRUSH brush = CreateSolidBrush(background); FillRect(item.hDC, &item.rcItem, brush); DeleteObject(brush);
     SetBkMode(item.hDC, TRANSPARENT); SetTextColor(item.hDC, RGB(35, 38, 42));
     RECT text = item.rcItem; const int padding = HeaderHeight() / 3; text.left += padding; text.right -= padding * 3;
-    DrawTextW(item.hDC, tabs_[index].profile.name.c_str(), -1, &text, DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS | DT_NOPREFIX);
+    const auto& tab = tabs_[index];
+    const auto state = static_cast<ExclusiveMouseState>(reinterpret_cast<ULONG_PTR>(GetPropW(tab.view, kExclusiveMouseStateProperty)));
+    const auto name = (state == ExclusiveMouseState::Active ? L"独占 · " :
+        state == ExclusiveMouseState::Failed ? L"独占失败 · " : L"") + tab.profile.name;
+    DrawTextW(item.hDC, name.c_str(), -1, &text, DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS | DT_NOPREFIX);
     const int x = item.rcItem.right - padding * 2, y = (item.rcItem.top + item.rcItem.bottom) / 2;
     const int radius = std::max(3, padding / 3);
     MoveToEx(item.hDC, x - radius, y - radius, nullptr); LineTo(item.hDC, x + radius, y + radius);
@@ -132,6 +136,11 @@ void Window::Menu(int index) {
     HMENU menu = CreatePopupMenu(); if (!menu) return;
     AppendMenuW(menu, MF_STRING | (tabs_[static_cast<size_t>(index)].view ? 0 : MF_GRAYED), kWorkspaceDetach, L"移到新窗口");
     AppendMenuW(menu, MF_STRING, kWorkspaceClose, L"关闭标签页");
+    const HWND view = tabs_[static_cast<size_t>(index)].view;
+    const auto state = static_cast<ExclusiveMouseState>(reinterpret_cast<ULONG_PTR>(GetPropW(view, kExclusiveMouseStateProperty)));
+    if (state != ExclusiveMouseState::Unavailable)
+        AppendMenuW(menu, MF_STRING, kWorkspaceExclusiveMouse,
+            state == ExclusiveMouseState::Active ? L"结束独占鼠标" : L"独占鼠标（60 秒）");
     if (ReadSetting(tabs_[static_cast<size_t>(index)].profile.path, L"permissions", L"secure_attention", L"0") == L"1")
         AppendMenuW(menu, MF_STRING, kWorkspaceSecureAttention, L"Ctrl+Alt+Del");
     POINT point{}; GetCursorPos(&point);
@@ -141,6 +150,8 @@ void Window::Menu(int index) {
     else if (command == kWorkspaceClose) CloseTab(index);
     else if (command == kWorkspaceSecureAttention && tabs_[static_cast<size_t>(index)].view)
         PostMessageW(tabs_[static_cast<size_t>(index)].view, kViewerSecureAttention, 0, 0);
+    else if (command == kWorkspaceExclusiveMouse)
+        PostMessageW(view, kViewerExclusiveMouse, state != ExclusiveMouseState::Active, 0);
 }
 LRESULT CALLBACK Window::TabProcedure(HWND control, UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR, DWORD_PTR data) {
     auto self = reinterpret_cast<Window*>(data);

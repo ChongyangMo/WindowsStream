@@ -1,4 +1,5 @@
 #include "input.h"
+#include "exclusive_mouse.h"
 
 InputInjector::~InputInjector() { ReleaseAll(); }
 
@@ -9,6 +10,9 @@ bool InputInjector::FinishFileDrag() {
 }
 
 bool InputInjector::Submit(INPUT* inputs, UINT count) {
+    for (UINT i = 0; i < count; ++i) {
+        if (inputs[i].type == INPUT_MOUSE) inputs[i].mi.dwExtraInfo = kWindowsStreamMouseInput;
+    }
     SetLastError(ERROR_SUCCESS);
     if ((!servermode::SecureAgent() || desktop_.Attach()) && SendInput(count, inputs, sizeof(INPUT)) == count)
         return true;

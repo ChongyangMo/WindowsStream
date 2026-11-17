@@ -37,6 +37,8 @@ enum MessageType : uint8_t {
     MsgReleaseAll = 44,
     MsgViewSize = 45,
     MsgMonitorMode = 46,
+    MsgExclusiveMouse = 47,
+    MsgExclusiveMouseState = 48,
     MsgRequestKeyframe = 50,
     MsgSecureAttention = 51,
     MsgFileDragAvailable = 60,
@@ -47,6 +49,8 @@ enum MessageType : uint8_t {
     MsgFileDragClose = 65,
     MsgFileDragAccept = 66,
 };
+
+enum class ExclusiveMouseState : uint8_t { Unavailable, Available, Active, Failed };
 
 constexpr uint32_t kProtocolVersion = 2;
 

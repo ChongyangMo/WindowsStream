@@ -43,6 +43,7 @@
     <ClCompile Include="..\host\encoder_hw_select.cpp" />
     <ClCompile Include="..\host\encoder_hw.cpp" />
     <ClCompile Include="..\host\encoder.cpp" />
+    <ClCompile Include="..\host\exclusive_mouse.cpp" />
     <ClCompile Include="..\host\gpu_convert.cpp" />
     <ClCompile Include="..\host\input.cpp" />
     <ClCompile Include="..\host\locate\locator.cpp" />
@@ -92,6 +93,7 @@
     <ClInclude Include="..\host\encoder_gpu_software.h" />
     <ClInclude Include="..\host\encoder_hw.h" />
     <ClInclude Include="..\host\encoder.h" />
+    <ClInclude Include="..\host\exclusive_mouse.h" />
     <ClInclude Include="..\host\gpu_convert.h" />
     <ClInclude Include="..\host\input.h" />
     <ClInclude Include="..\host\locate\locator.h" />
