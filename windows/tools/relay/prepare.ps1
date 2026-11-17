@@ -99,6 +99,7 @@ enabled=0
 
 [background]
 autostart=0
+manage_autostart=0
 tray=1
 start_hidden=0
 keep_awake=0
@@ -125,5 +126,8 @@ enabled=0
 Copy-Item -LiteralPath $hostProgram, $bridge, (Join-Path $PSScriptRoot 'Start-WindowsStream.cmd') -Destination $hostFolder
 $launcher = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'start-host.ps1'), $utf8)
 [IO.File]::WriteAllText((Join-Path $hostFolder 'start-host.ps1'), $launcher, [Text.UTF8Encoding]::new($true))
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Open-WindowsStream.cmd') -Destination $viewer
+$launcher = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'open-controller.ps1'), $utf8)
+[IO.File]::WriteAllText((Join-Path $viewer 'open-controller.ps1'), $launcher, [Text.UTF8Encoding]::new($true))
 Compress-Archive -Path (Join-Path $hostFolder '*') -DestinationPath (Join-Path $folder "WindowsStream-$name-host.zip") -Force
 Write-Output ('已生成 WindowsStream 中转被控端包和控制端配置：' + $name)

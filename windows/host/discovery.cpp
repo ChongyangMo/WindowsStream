@@ -8,7 +8,7 @@ DiscoveryResponder::~DiscoveryResponder() {
 }
 
 void DiscoveryResponder::Start(const HostConfig& config) {
-    if (config.reverse) return;  // 主动连接模式没有对外监听的被控端端口。
+    if (config.reverse || config.bindHost == L"127.0.0.1") return;  // 没有对外监听的被控端端口。
     running_ = true;
     thread_ = std::thread([this, config] {
         SOCKET socket = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);

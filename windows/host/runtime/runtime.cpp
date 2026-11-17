@@ -23,14 +23,15 @@ void HostRuntime::Start(HWND window, const HostConfig& config, bool background, 
     ini_ = PortableDir() + L"\\host.ini";
     taskbarCreated_ = RegisterWindowMessageW(L"TaskbarCreated");
     const bool guardReady = !config_.watchdog || guard_.Start();
-    if (!SetUserAutoStart(config_.autoStart)) config_.autoStart = false;
+    if (config_.manageAutoStart && !SetUserAutoStart(config_.autoStart)) config_.autoStart = false;
     if (config_.keepAwake && !Awake(true)) config_.keepAwake = false;
     if (!config_.keepAwake) RestoreDormantScreenSaver(PortableDir());
     power_.Start(window_);
     const bool hidden = config_.tray && tray_.Add(window_) && background;
     ShowWindow(window_, hidden ? SW_HIDE : show == SW_HIDE ? SW_SHOWNOACTIVATE : show);
     LogLine("托盘常驻：%s；登录自启 %s，保持唤醒 %s，异常恢复 %s", tray_.Added() ? "已启用" : "未启用",
-        config_.autoStart ? "开" : "关", config_.keepAwake ? "开" : "关", config_.watchdog ? (guardReady ? "开" : "等待重试") : "关");
+        config_.manageAutoStart ? (config_.autoStart ? "开" : "关") : "由外部管理",
+        config_.keepAwake ? "开" : "关", config_.watchdog ? (guardReady ? "开" : "等待重试") : "关");
 }
 void HostRuntime::Stop() { guard_.Stop(); power_.Stop(); idle_.Stop(); KillTimer(window_, 30); awake_.Release(updateHandoff_); tray_.Remove(); }
 void HostRuntime::WatchdogTick() {
@@ -78,7 +79,8 @@ bool HostRuntime::Handle(UINT message, WPARAM wParam, LPARAM lParam, LRESULT& re
         case kHostExitForUpdate: updateHandoff_ = true; Exit("正在升级"); return true;
         case kTrayCallback: {
             const auto event = LOWORD(lParam);
-            if (event == WM_CONTEXTMENU || event == WM_RBUTTONUP) tray_.Menu(config_.autoStart, config_.keepAwake);
+            if (event == WM_CONTEXTMENU || event == WM_RBUTTONUP)
+                tray_.Menu(config_.manageAutoStart, config_.autoStart, config_.keepAwake);
             else if (event == NIN_SELECT || event == NIN_KEYSELECT || event == WM_LBUTTONDBLCLK) Show();
             return true;
         }
@@ -88,7 +90,10 @@ bool HostRuntime::Handle(UINT message, WPARAM wParam, LPARAM lParam, LRESULT& re
                 case 2: case kHostExitCommand: Exit("用户主动退出"); return true;
                 case kTrayShow: Show(); return true;
                 case kTrayAutoStart:
-                    if (SetUserAutoStart(!config_.autoStart)) { config_.autoStart = !config_.autoStart; Save(L"autostart", config_.autoStart); }
+                    if (config_.manageAutoStart && SetUserAutoStart(!config_.autoStart)) {
+                        config_.autoStart = !config_.autoStart;
+                        Save(L"autostart", config_.autoStart);
+                    }
                     return true;
                 case kTrayKeepAwake:
                     if (Awake(!config_.keepAwake)) { config_.keepAwake = !config_.keepAwake; Save(L"keep_awake", config_.keepAwake); }

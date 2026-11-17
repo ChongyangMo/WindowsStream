@@ -10,7 +10,7 @@ public:
     bool Add(HWND owner);
     void Remove();
     void Status(const std::wstring& status);
-    void Menu(bool autoStart, bool keepAwake);
+    void Menu(bool manageAutoStart, bool autoStart, bool keepAwake);
     bool Added() const { return added_; }
 private:
     NOTIFYICONDATAW data_{};

@@ -57,6 +57,7 @@ bool LoadHostConfig(HostConfig& config, std::wstring& error) {
     config.nativeResolution = _wcsicmp(buffer, L"native") == 0;
     config.clipboard = GetPrivateProfileIntW(L"permissions", L"clipboard", 1, path.c_str()) != 0;
     config.autoStart = GetPrivateProfileIntW(L"background", L"autostart", 1, path.c_str()) != 0;
+    config.manageAutoStart = GetPrivateProfileIntW(L"background", L"manage_autostart", 1, path.c_str()) != 0;
     config.tray = GetPrivateProfileIntW(L"background", L"tray", 1, path.c_str()) != 0;
     config.startHidden = GetPrivateProfileIntW(L"background", L"start_hidden", 1, path.c_str()) != 0;
     config.keepAwake = GetPrivateProfileIntW(L"background", L"keep_awake", 1, path.c_str()) != 0;
