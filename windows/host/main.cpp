@@ -7,26 +7,58 @@
 #include "locate/locator.h"
 #include "../shared/host_control.h"
 #include "../shared/app_icon.h"
+#include "../shared/net_health.h"
 #include <shellapi.h>
 #include <thread>
 
 namespace {
 constexpr UINT kStatus = WM_APP + 1;
+constexpr UINT_PTR kAddressTimer = 33;
 HostServer server;
 HostRuntime runtime;
 HWND statusLabel = nullptr;
+HWND addressList = nullptr;
+std::wstring displayedAddresses;
+
+void RefreshLocalAddresses() {
+    std::wstring text;
+    for (const auto& address : net::LocalIPv4Addresses()) {
+        if (!text.empty()) text += L"\r\n";
+        text += address;
+    }
+    if (text.empty()) text = L"暂无 IPv4 地址";
+    if (text == displayedAddresses) return;
+    SetWindowTextW(addressList, text.c_str());
+    displayedAddresses = std::move(text);
+}
 
 LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     LRESULT runtimeResult = 0;
     if (runtime.Handle(message, wParam, lParam, runtimeResult)) return runtimeResult;
     switch (message) {
-        case WM_CREATE:
+        case WM_CREATE: {
             statusLabel = CreateWindowW(L"STATIC", L"正在启动", WS_CHILD | WS_VISIBLE | SS_CENTER,
-                                        20, 24, 240, 30, window, nullptr, nullptr, nullptr);
+                                        20, 16, 240, 20, window, nullptr, nullptr, nullptr);
+            const HWND addressLabel = CreateWindowW(L"STATIC", L"本机 IP", WS_CHILD | WS_VISIBLE | SS_CENTER,
+                                                   20, 44, 240, 20, window, nullptr, nullptr, nullptr);
+            addressList = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL |
+                ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | ES_CENTER, 20, 66, 240, 92, window, nullptr, nullptr, nullptr);
+            for (const auto control : {addressLabel, addressList})
+                SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(GetStockObject(DEFAULT_GUI_FONT)), TRUE);
+            RefreshLocalAddresses();
+            SetTimer(window, kAddressTimer, 3000, nullptr);
             CreateWindowW(L"BUTTON", L"隐藏", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                          40, 68, 90, 30, window, reinterpret_cast<HMENU>(1), nullptr, nullptr);
+                          40, 172, 90, 30, window, reinterpret_cast<HMENU>(1), nullptr, nullptr);
             CreateWindowW(L"BUTTON", L"退出", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                          150, 68, 90, 30, window, reinterpret_cast<HMENU>(2), nullptr, nullptr);
+                          150, 172, 90, 30, window, reinterpret_cast<HMENU>(2), nullptr, nullptr);
+            return 0;
+        }
+        case WM_SHOWWINDOW:
+            if (wParam) RefreshLocalAddresses();
+            break;
+        case WM_TIMER:
+            if (wParam != kAddressTimer) break;
+            if (IsWindowVisible(window)) RefreshLocalAddresses();
             return 0;
         case kStatus: {
             std::unique_ptr<std::wstring> status(reinterpret_cast<std::wstring*>(lParam));
@@ -35,6 +67,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             return 0;
         }
         case WM_DESTROY:
+            KillTimer(window, kAddressTimer);
             PostQuitMessage(0);
             return 0;
     }
@@ -61,7 +94,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     }
     std::string bootId;
     const bool background = arguments && argumentCount == 2 && std::wstring(arguments[1]) == L"--background";
-    if (arguments && argumentCount == 3 && std::wstring(arguments[1]) == L"--updated") bootId = WideToUtf8(arguments[2]);
+    const bool updated = arguments && argumentCount == 3 && std::wstring(arguments[1]) == L"--updated";
+    if (updated) bootId = WideToUtf8(arguments[2]);
     if (arguments) LocalFree(arguments);
     HANDLE single = CreateMutexW(nullptr, TRUE, L"Local\\WindowsStreamHost");
     if (!single || GetLastError() == ERROR_ALREADY_EXISTS) {
@@ -91,14 +125,15 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     type.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     type.hIcon = LoadAppIcon();
     RegisterClassW(&type);
-    RECT area{0, 0, 280, 120};
+    RECT area{0, 0, 280, 222};
     AdjustWindowRect(&area, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE);
     HWND window = CreateWindowW(type.lpszClassName, L"WindowsStream 被控端",
                                 WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
                                 CW_USEDEFAULT, CW_USEDEFAULT, area.right - area.left, area.bottom - area.top,
                                 nullptr, nullptr, instance, nullptr);
     if (!window) { WSACleanup(); CloseHandle(single); return 1; }
-    runtime.Start(window, config, background, show, [window] { server.Stop(); DestroyWindow(window); });
+    runtime.Start(window, config, background || (updated && config.startHidden), show,
+                  [window] { server.Stop(); DestroyWindow(window); });
     LogLine("Windows 被控端启动，模式：%s", config.reverse ? "主动连接控制端" : "等待控制端连接");
     Locator().Init(config);
     HostUpdateClient updateClient;

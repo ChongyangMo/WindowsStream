@@ -26,7 +26,7 @@ void HostRuntime::Start(HWND window, const HostConfig& config, bool background, 
     if (!config_.keepAwake) RestoreDormantScreenSaver(PortableDir());
     power_.Start(window_);
     if (config_.watchdog && !guard_.Start()) { config_.watchdog = false; LogLine("启动异常退出守护失败：%lu", GetLastError()); }
-    const bool hidden = config_.tray && tray_.Add(window_) && (background || config_.startHidden);
+    const bool hidden = config_.tray && tray_.Add(window_) && background;
     ShowWindow(window_, hidden ? SW_HIDE : show == SW_HIDE ? SW_SHOWNOACTIVATE : show);
     LogLine("托盘常驻：%s；登录自启 %s，保持唤醒 %s，异常恢复 %s", tray_.Added() ? "已启用" : "未启用",
         config_.autoStart ? "开" : "关", config_.keepAwake ? "开" : "关", config_.watchdog ? "开" : "关");

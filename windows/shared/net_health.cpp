@@ -53,6 +53,41 @@ bool LocalAddressReady(const std::wstring& address) {
     return AnyPreferred([&](const IN_ADDR& local) { return local.s_addr == wanted.s_addr; });
 }
 
+std::vector<std::wstring> LocalIPv4Addresses() {
+    ULONG size = 16384;
+    std::vector<uint8_t> buffer;
+    ULONG status = ERROR_BUFFER_OVERFLOW;
+    constexpr ULONG flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER;
+    for (int attempt = 0; attempt < 3 && status == ERROR_BUFFER_OVERFLOW; ++attempt) {
+        buffer.resize(size);
+        status = GetAdaptersAddresses(AF_INET, flags, nullptr,
+                                      reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data()), &size);
+    }
+    if (status != NO_ERROR) return {};
+
+    std::vector<std::wstring> physical, other;
+    for (auto* adapter = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data()); adapter; adapter = adapter->Next) {
+        if (adapter->OperStatus != IfOperStatusUp || adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK) continue;
+        MIB_IF_ROW2 row{};
+        row.InterfaceLuid = adapter->Luid;
+        const bool hardware = GetIfEntry2(&row) == NO_ERROR && row.InterfaceAndOperStatusFlags.HardwareInterface;
+        auto& addresses = hardware ? physical : other;
+        for (auto* entry = adapter->FirstUnicastAddress; entry; entry = entry->Next) {
+            const auto* socketAddress = entry->Address.lpSockaddr;
+            if (!socketAddress || socketAddress->sa_family != AF_INET || entry->DadState != IpDadStatePreferred) continue;
+            const auto& ip = reinterpret_cast<const sockaddr_in*>(socketAddress)->sin_addr;
+            if (ip.s_addr == INADDR_ANY || ip.S_un.S_un_b.s_b1 == 127) continue;
+            wchar_t address[INET_ADDRSTRLEN]{};
+            if (InetNtopW(AF_INET, &ip, address, INET_ADDRSTRLEN) &&
+                std::find(addresses.begin(), addresses.end(), address) == addresses.end()) addresses.emplace_back(address);
+        }
+    }
+    for (auto& address : other) {
+        if (std::find(physical.begin(), physical.end(), address) == physical.end()) physical.push_back(std::move(address));
+    }
+    return physical;
+}
+
 bool AddressWatch::Lost() {
     const auto now = GetTickCount64();
     if (now < next_) return false;

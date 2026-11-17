@@ -5,6 +5,8 @@
 namespace net {
 // 0.0.0.0 和回环地址总是可用；其他地址须当前存在于本机网卡且已完成冲突检测。
 bool LocalAddressReady(const std::wstring& address);
+// 已启用网卡上的可用 IPv4 地址，物理网卡排在前面。
+std::vector<std::wstring> LocalIPv4Addresses();
 // 已打开的监听器按间隔复查地址，避免每次轮询都枚举网卡。
 class AddressWatch {
 public:
