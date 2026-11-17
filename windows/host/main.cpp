@@ -2,6 +2,7 @@
 #include "exclusive_mouse.h"
 #include "update/client.h"
 #include "update/apply.h"
+#include "runtime/autorun.h"
 #include "runtime/runtime.h"
 #include "proxy/client.h"
 #include "service/service.h"
@@ -10,6 +11,7 @@
 #include "../shared/app_icon.h"
 #include "../shared/net_health.h"
 #include <shellapi.h>
+#include <string_view>
 #include <thread>
 
 namespace {
@@ -114,6 +116,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     if (arguments && argumentCount == 3 && std::wstring(arguments[1]) == L"--apply-update") {
         const auto ticket = std::wstring(arguments[2]); LocalFree(arguments);
         return updates::Apply(ticket);
+    }
+    if (arguments && argumentCount == 2 && std::wstring_view(arguments[1]) == kRelayAutoStartArgument) {
+        LocalFree(arguments);
+        return LaunchRelayAutoStart();
     }
     std::string bootId;
     const bool background = arguments && argumentCount == 2 && std::wstring(arguments[1]) == L"--background";

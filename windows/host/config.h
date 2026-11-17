@@ -22,6 +22,8 @@ struct HostConfig {
     uint16_t updatePort = 7402;
     unsigned updateSeconds = 15;
     bool autoStart = true, manageAutoStart = true, tray = true, startHidden = true;
+    bool relayAutoStart = false;
+    std::wstring autoStartIni;
     bool keepAwake = true, watchdog = true;
     bool idlePulse = true;
     unsigned idleSeconds = 120;

@@ -29,7 +29,7 @@ void HostTray::Menu(bool manageAutoStart, bool autoStart, bool keepAwake) {
     HMENU menu = CreatePopupMenu();
     if (!menu) return;
     AppendMenuW(menu, MF_STRING, kTrayShow, L"显示窗口");
-    if (manageAutoStart) AppendMenuW(menu, MF_STRING | (autoStart ? MF_CHECKED : 0), kTrayAutoStart, L"开机启动");
+    if (manageAutoStart) AppendMenuW(menu, MF_STRING | (autoStart ? MF_CHECKED : 0), kTrayAutoStart, L"开机自启动");
     AppendMenuW(menu, MF_STRING | (keepAwake ? MF_CHECKED : 0), kTrayKeepAwake, L"屏幕常亮");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, kHostExitCommand, L"退出");

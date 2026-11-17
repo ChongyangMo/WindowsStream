@@ -1,4 +1,5 @@
 #include "config.h"
+#include <filesystem>
 
 bool LoadHostConfig(HostConfig& config, std::wstring& error) {
     const auto directory = PortableDir();
@@ -60,6 +61,13 @@ bool LoadHostConfig(HostConfig& config, std::wstring& error) {
     config.exclusiveMouse = GetPrivateProfileIntW(L"permissions", L"exclusive_mouse", 0, path.c_str()) == 1;
     config.autoStart = GetPrivateProfileIntW(L"background", L"autostart", 1, path.c_str()) != 0;
     config.manageAutoStart = GetPrivateProfileIntW(L"background", L"manage_autostart", 1, path.c_str()) != 0;
+    config.relayAutoStart = GetPrivateProfileIntW(L"background", L"relay_autostart", 0, path.c_str()) != 0;
+    GetPrivateProfileStringW(L"background", L"autostart_ini", L"", buffer, 1024, path.c_str());
+    config.autoStartIni = path;
+    if (*buffer) {
+        config.autoStartIni = (std::filesystem::path(directory) / buffer).lexically_normal().wstring();
+        config.autoStart = GetPrivateProfileIntW(L"background", L"autostart", config.autoStart, config.autoStartIni.c_str()) != 0;
+    }
     config.tray = GetPrivateProfileIntW(L"background", L"tray", 1, path.c_str()) != 0;
     config.startHidden = GetPrivateProfileIntW(L"background", L"start_hidden", 1, path.c_str()) != 0;
     config.keepAwake = GetPrivateProfileIntW(L"background", L"keep_awake", 1, path.c_str()) != 0;

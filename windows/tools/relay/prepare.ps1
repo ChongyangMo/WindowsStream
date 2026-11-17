@@ -99,7 +99,7 @@ enabled=0
 
 [background]
 autostart=0
-manage_autostart=0
+relay_autostart=1
 tray=1
 start_hidden=0
 keep_awake=0

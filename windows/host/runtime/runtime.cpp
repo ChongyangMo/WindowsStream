@@ -23,7 +23,7 @@ void HostRuntime::Start(HWND window, const HostConfig& config, bool background, 
     ini_ = PortableDir() + L"\\host.ini";
     taskbarCreated_ = RegisterWindowMessageW(L"TaskbarCreated");
     const bool guardReady = !config_.watchdog || guard_.Start();
-    if (config_.manageAutoStart && !SetUserAutoStart(config_.autoStart)) config_.autoStart = false;
+    if (config_.manageAutoStart && !SetUserAutoStart(config_.autoStart, config_.relayAutoStart)) config_.autoStart = false;
     if (config_.keepAwake && !Awake(true)) config_.keepAwake = false;
     if (!config_.keepAwake) RestoreDormantScreenSaver(PortableDir());
     power_.Start(window_);
@@ -90,9 +90,11 @@ bool HostRuntime::Handle(UINT message, WPARAM wParam, LPARAM lParam, LRESULT& re
                 case 2: case kHostExitCommand: Exit("用户主动退出"); return true;
                 case kTrayShow: Show(); return true;
                 case kTrayAutoStart:
-                    if (config_.manageAutoStart && SetUserAutoStart(!config_.autoStart)) {
-                        config_.autoStart = !config_.autoStart;
-                        Save(L"autostart", config_.autoStart);
+                    if (config_.manageAutoStart) {
+                        if (SaveUserAutoStart(!config_.autoStart, config_.relayAutoStart, config_.autoStartIni))
+                            config_.autoStart = !config_.autoStart;
+                        else MessageBoxW(window_, L"无法保存开机自启动设置，请检查程序目录和 Windows 启动权限。",
+                                         L"WindowsStream", MB_OK | MB_ICONERROR);
                     }
                     return true;
                 case kTrayKeepAwake:
