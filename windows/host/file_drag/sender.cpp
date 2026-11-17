@@ -24,6 +24,15 @@ bool Sender::Handle(uint8_t type, const std::vector<uint8_t>& payload, InputInje
         case MsgFileDragClose:
             if (enabled_ && payload.size() == 4) offers_.erase(ReadU32(payload.data()));
             return true;
+        case MsgFileDragAccept:
+            if (enabled_ && payload.size() == 4) {
+                const auto offer = offers_.find(ReadU32(payload.data()));
+                if (offer != offers_.end() && !offer->second.accepted) {
+                    if (input.CanHandOffDrag() && input.FinishFileDrag()) offer->second.accepted = true;
+                    else offers_.erase(offer);
+                }
+            }
+            return true;
         default:
             return false;
     }
@@ -57,21 +66,19 @@ void Sender::Probe(uint32_t id, InputInjector& input) {
     std::vector<Source> files;
     if (input.CanHandOffDrag() && offers_.size() < 8 && !offers_.contains(id) && servermode::DesktopAccessible()) {
         const auto paths = capture_.Probe(id);
+        capture_.Hide(id);
         if (!paths.empty()) {
             files = OpenFiles(paths);
             if (files.empty()) {
                 LogLine("无法读取本次拖拽的文件，目录及不可读文件无法传输");
-            } else if (!input.FinishFileDrag()) {
-                files.clear();
             }
         }
-        capture_.Hide(id);
     }
     Writer offer;
     offer.u32(id);
     offer.u16(static_cast<uint16_t>(files.size()));
     for (const auto& source : files) WriteFile(offer, source.file);
-    if (!files.empty()) offers_.emplace(id, std::move(files));
+    if (!files.empty()) offers_.emplace(id, OfferedFiles{std::move(files)});
     if (!channel_.Send(MsgFileDragOffer, offer)) channel_.Shutdown();
 }
 
@@ -86,8 +93,8 @@ void Sender::Read(const std::vector<uint8_t>& payload) {
     Writer response;
     response.u32(request);
     response.u8(0);
-    if (offer != offers_.end() && index < offer->second.size() && length && length <= kReadSize) {
-        const auto& source = offer->second[index];
+    if (offer != offers_.end() && offer->second.accepted && index < offer->second.files.size() && length && length <= kReadSize) {
+        const auto& source = offer->second.files[index];
         if (offset < source.file.size && length <= source.file.size - offset) {
             LARGE_INTEGER position{};
             position.QuadPart = static_cast<LONGLONG>(offset);

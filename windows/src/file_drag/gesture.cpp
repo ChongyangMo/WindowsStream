@@ -21,7 +21,10 @@ void Gesture::Receive(uint8_t type, std::vector<uint8_t>& data) {
     switch (type) {
         case MsgFileDragAvailable: {
             std::lock_guard lock(mutex_);
-            if (data.empty()) available_ = true;
+            if (data.empty() && !available_) {
+                available_ = true;
+                LogLine("被控端支持拖拽文件到本机");
+            }
             return;
         }
         case MsgFileDragData:
@@ -98,6 +101,11 @@ std::shared_ptr<Offer> Gesture::Take(HWND viewer) {
         waiting_ = 0;
     }
     if (GetCapture() != viewer || !(GetAsyncKeyState(VK_LBUTTON) & 0x8000)) return {};
+    POINT point{};
+    if (!GetCursorPos(&point) || GetAncestor(WindowFromPoint(point), GA_ROOT) == GetAncestor(viewer, GA_ROOT)) return {};
+    Writer accept;
+    accept.u32(offer->id);
+    if (!offer->peer->Send(MsgFileDragAccept, accept)) return {};
     return offer;
 }
 

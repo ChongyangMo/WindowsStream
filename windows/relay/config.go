@@ -19,6 +19,8 @@ type config struct {
 	device    string
 	token     string
 	local     string
+	enrollment string
+	viewerHash string
 }
 
 func loadConfig(path string) (config, error) {
@@ -33,6 +35,7 @@ func loadConfig(path string) (config, error) {
 		"role": &c.role, "endpoint": &c.endpoint, "server_address": &c.server,
 		"http_proxy": &c.httpProxy, "device": &c.device, "token": &c.token,
 		"local_address": &c.local,
+		"enrollment": &c.enrollment, "viewer_sha256": &c.viewerHash,
 	}
 	scanner := bufio.NewScanner(file)
 	for lineNumber := 1; scanner.Scan(); lineNumber++ {
@@ -85,6 +88,13 @@ func loadConfig(path string) (config, error) {
 	}
 	if c.device == "" || len(c.device) > 64 || strings.Trim(c.device, "abcdefghijklmnopqrstuvwxyz0123456789-") != "" {
 		return c, fmt.Errorf("设备标识无效")
+	}
+	if c.enrollment != "" || c.viewerHash != "" {
+		enrollment, enrollErr := hex.DecodeString(c.enrollment)
+		viewerHash, viewerErr := hex.DecodeString(c.viewerHash)
+		if c.role != "host" || len(enrollment) != 32 || len(viewerHash) != 32 || enrollErr != nil || viewerErr != nil {
+			return c, fmt.Errorf("被控端登记信息无效")
+		}
 	}
 	return c, nil
 }

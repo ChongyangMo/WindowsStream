@@ -19,6 +19,10 @@ private:
         File file;
         std::unique_ptr<void, CloseFile> handle;
     };
+    struct OfferedFiles {
+        std::vector<Source> files;
+        bool accepted = false;
+    };
     static std::vector<Source> OpenFiles(const std::vector<std::wstring>& paths);
     void Probe(uint32_t id, InputInjector& input);
     void Read(const std::vector<uint8_t>& payload);
@@ -26,6 +30,6 @@ private:
     HostChannel& channel_;
     Capture capture_;
     bool enabled_ = false;
-    std::map<uint32_t, std::vector<Source>> offers_;
+    std::map<uint32_t, OfferedFiles> offers_;
 };
 }

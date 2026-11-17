@@ -45,6 +45,7 @@ enum MessageType : uint8_t {
     MsgFileDragRead = 63,
     MsgFileDragData = 64,
     MsgFileDragClose = 65,
+    MsgFileDragAccept = 66,
 };
 
 constexpr uint32_t kProtocolVersion = 2;

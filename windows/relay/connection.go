@@ -29,6 +29,10 @@ func openWebSocket(c config) (*websocket.Conn, error) {
 	config.Header.Set("Authorization", "Bearer "+c.token)
 	config.Header.Set("X-WindowsStream-Role", c.role)
 	config.Header.Set("X-WindowsStream-Device", c.device)
+	if c.enrollment != "" {
+		config.Header.Set("X-WindowsStream-Enrollment", c.enrollment)
+		config.Header.Set("X-WindowsStream-Viewer-Hash", c.viewerHash)
+	}
 
 	address := c.server
 	if c.httpProxy != "" {
