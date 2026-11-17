@@ -2,6 +2,24 @@
 #include "capture_diag.h"
 #include <dxgi1_5.h>
 
+bool GpuCapture::OpenDuplication(bool log) {
+    const HRESULT first = output_->DuplicateOutput(device_.Get(), &duplication_);
+    if (SUCCEEDED(first)) return true;
+
+    // 旧接口不可用时尝试 Windows 10 起的 DuplicateOutput1。
+    ComPtr<IDXGIOutput5> output5;
+    const DXGI_FORMAT formats[] = {DXGI_FORMAT_B8G8R8A8_UNORM};
+    const HRESULT second = SUCCEEDED(output_.As(&output5))
+        ? output5->DuplicateOutput1(device_.Get(), 0, 1, formats, &duplication_) : E_NOINTERFACE;
+    if (log && FAILED(second)) {
+        LogLine("启动桌面复制失败：0x%08X，DuplicateOutput1：0x%08X", static_cast<unsigned>(first), static_cast<unsigned>(second));
+        if (first == E_ACCESSDENIED) LogDuplicationDenied();
+    } else if (log) {
+        LogLine("旧桌面复制接口被拒（0x%08X），已改用 DuplicateOutput1", static_cast<unsigned>(first));
+    }
+    return SUCCEEDED(second);
+}
+
 bool GpuCapture::Initialize(bool log) {
     ComPtr<IDXGIFactory1> factory;
     if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) return false;
@@ -39,22 +57,8 @@ bool GpuCapture::Initialize(bool log) {
     }
     ComPtr<ID3D10Multithread> multithread;
     if (SUCCEEDED(device_.As(&multithread))) multithread->SetMultithreadProtected(TRUE);
-    result = selectedOutput->DuplicateOutput(device_.Get(), &duplication_);
-    if (FAILED(result)) {
-        // 旧接口被拒时改用 Windows 10 起的 DuplicateOutput1，两者都失败才退回 GDI。
-        ComPtr<IDXGIOutput5> output5;
-        const DXGI_FORMAT formats[] = {DXGI_FORMAT_B8G8R8A8_UNORM};
-        const HRESULT second = SUCCEEDED(selectedOutput.As(&output5))
-            ? output5->DuplicateOutput1(device_.Get(), 0, 1, formats, &duplication_) : E_NOINTERFACE;
-        if (FAILED(second)) {
-            if (log) {
-                LogLine("启动桌面复制失败：0x%08X，DuplicateOutput1：0x%08X", static_cast<unsigned>(result), static_cast<unsigned>(second));
-                if (result == E_ACCESSDENIED) LogDuplicationDenied();
-            }
-            return false;
-        }
-        if (log) LogLine("旧桌面复制接口被拒（0x%08X），已改用 DuplicateOutput1", static_cast<unsigned>(result));
-    }
+    output_ = std::move(selectedOutput);
+    if (!OpenDuplication(log)) return false;
     DXGI_OUTDUPL_DESC desc{};
     duplication_->GetDesc(&desc);
     width_ = static_cast<int>(desc.ModeDesc.Width);
@@ -82,11 +86,35 @@ bool GpuCapture::Initialize(bool log) {
     return true;
 }
 
+CaptureResult GpuCapture::LostDuplication() {
+    duplication_.Reset();
+    haveFrame_ = false;
+    const auto now = GetTickCount64();
+    if (!recoverUntil_) recoverUntil_ = now + 3000;
+    retryAt_ = now + 250;
+    return CaptureResult::Unavailable;
+}
+
 CaptureResult GpuCapture::Read(uint64_t& timestamp) {
+    const auto now = GetTickCount64();
+    if (recoverUntil_ && now >= recoverUntil_) {
+        LogLine("桌面切换后 GPU 采集仍未恢复，重新协商采集路径");
+        return CaptureResult::Failed;
+    }
+    if (!duplication_) {
+        if (now < retryAt_) return CaptureResult::Unavailable;
+        if (FAILED(device_->GetDeviceRemovedReason())) return CaptureResult::Failed;
+        if (!OpenDuplication(false)) return LostDuplication();
+        DXGI_OUTDUPL_DESC extent{};
+        duplication_->GetDesc(&extent);
+        if (extent.ModeDesc.Width != static_cast<UINT>(width_) || extent.ModeDesc.Height != static_cast<UINT>(height_) ||
+            extent.Rotation != DXGI_MODE_ROTATION_IDENTITY) return CaptureResult::Failed;
+    }
     DXGI_OUTDUPL_FRAME_INFO info{};
     ComPtr<IDXGIResource> resource;
     const HRESULT result = duplication_->AcquireNextFrame(0, &info, &resource);
-    if (result == DXGI_ERROR_WAIT_TIMEOUT) return CaptureResult::Idle;
+    if (result == DXGI_ERROR_WAIT_TIMEOUT) return recoverUntil_ ? CaptureResult::Unavailable : CaptureResult::Idle;
+    if (result == DXGI_ERROR_ACCESS_LOST) return LostDuplication();
     if (FAILED(result)) {
         LogLine("GPU 采集失效，需要重连：0x%08X", static_cast<unsigned>(result));
         return CaptureResult::Failed;
@@ -105,6 +133,8 @@ CaptureResult GpuCapture::Read(uint64_t& timestamp) {
         haveFrame_ = true;
     }
     const HRESULT release = duplication_->ReleaseFrame();
+    if (release == DXGI_ERROR_ACCESS_LOST) return LostDuplication();
     if (!valid || FAILED(release)) return CaptureResult::Failed;
+    recoverUntil_ = 0;
     return updated ? CaptureResult::Frame : CaptureResult::Idle;
 }

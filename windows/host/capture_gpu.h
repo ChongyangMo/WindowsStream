@@ -3,7 +3,7 @@
 #include <d3d11.h>
 #include <dxgi1_2.h>
 
-enum class CaptureResult { Frame, Idle, Failed };
+enum class CaptureResult { Frame, Idle, Unavailable, Failed };
 
 class GpuCapture {
 public:
@@ -18,11 +18,15 @@ public:
     bool HasFrame() const { return haveFrame_; }
     const std::wstring& AdapterName() const { return adapterName_; }
 private:
+    bool OpenDuplication(bool log);
+    CaptureResult LostDuplication();
     ComPtr<ID3D11Device> device_;
     ComPtr<ID3D11DeviceContext> context_;
+    ComPtr<IDXGIOutput1> output_;
     ComPtr<IDXGIOutputDuplication> duplication_;
     ComPtr<ID3D11Texture2D> image_;
     int width_ = 0, height_ = 0, refreshHz_ = 0;
     std::wstring adapterName_;
     bool haveFrame_ = false;
+    ULONGLONG recoverUntil_ = 0, retryAt_ = 0;
 };
