@@ -17,6 +17,8 @@
 - 控制端 `windows/build/2release/controller/WindowsStream.exe`
 - 被控端 `windows/build/2release/host/WindowsStream-Host.exe`
 
+控制端右键托盘图标，打开「网络配置」，可以配置网线直连、放行或撤销 VMware 虚拟机代理的防火墙规则。选择操作后确认 Windows 管理员权限提示。配置逻辑内置于控制端 EXE。
+
 在 Visual Studio 打开 `WindowsStream.slnx`，选择 `Release | x64` 并生成解决方案。也可以在 Visual Studio 开发人员终端运行以下命令。
 
 ```powershell

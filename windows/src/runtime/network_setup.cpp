@@ -64,7 +64,7 @@ int Configure(const Action& action) {
     DWORD exitCode = 1;
     GetExitCodeProcess(child.hProcess, &exitCode);
     CloseHandle(child.hProcess);
-    LogLine("网络配置 %ls，结果码 %lu", action.label, exitCode);
+    LogLine("网络配置 %s，结果码 %lu", WideToUtf8(action.label).c_str(), exitCode);
     return exitCode == 0 ? 0 : 1;
 }
 }

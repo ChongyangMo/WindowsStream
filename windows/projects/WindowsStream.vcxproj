@@ -24,9 +24,10 @@
   </PropertyGroup>
   <Import Project="WindowsStream.props" />
   <ItemDefinitionGroup>
-    <Link><AdditionalDependencies>d3d11.lib;dxgi.lib;mfplat.lib;mfuuid.lib;wmcodecdspuuid.lib;strmiids.lib;d3dcompiler.lib;imm32.lib;wininet.lib;comctl32.lib;comdlg32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
+    <Link><AdditionalDependencies>d3d11.lib;dxgi.lib;mfplat.lib;mfuuid.lib;wmcodecdspuuid.lib;strmiids.lib;d3dcompiler.lib;imm32.lib;wininet.lib;comctl32.lib;comdlg32.lib;crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\runtime\network_setup.cpp" />
     <ClCompile Include="..\src\file_drag\gesture.cpp" />
     <ClCompile Include="..\src\file_drag\drop.cpp" />
     <ClCompile Include="..\src\file_drag\stream.cpp" />
@@ -127,14 +128,13 @@
     <PortableConfig Include="..\config\client.ini.example" Condition="!Exists('..\config\client.ini')"><TargetName>client.ini</TargetName></PortableConfig>
   </ItemGroup>
   <ItemGroup>
-    <PortableTool Include="..\tools\setup-link.cmd" />
-    <PortableTool Include="..\tools\setup-link.ps1" />
-    <PortableTool Include="..\tools\setup-vm-proxy.cmd" />
-    <PortableTool Include="..\tools\setup-vm-proxy.ps1" />
+    <ClInclude Include="..\src\runtime\network_setup.h" />
+    <None Include="..\resources\network-setup.ps1" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="WindowsStream.targets" />
   <Target Name="BuildControllerRelay" AfterTargets="CopyPortableFiles">
+    <Delete Files="$(OutDir)setup-link.cmd;$(OutDir)setup-link.ps1;$(OutDir)setup-vm-proxy.cmd;$(OutDir)setup-vm-proxy.ps1" />
     <Exec Command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(WindowsRoot)tools\relay\build-bridge.ps1&quot; -Output &quot;$(OutDir).runtime\WindowsStreamBridge.exe&quot;" />
   </Target>
 </Project>

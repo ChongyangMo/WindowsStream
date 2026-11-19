@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <ClCompile Include="..\src\runtime\network_setup.cpp"><Filter>src\runtime</Filter></ClCompile>
     <Filter Include="src\file_drag"><UniqueIdentifier>{1156a90d-4d2a-4d2a-b0f0-1f8833818ae7}</UniqueIdentifier></Filter>
     <Filter Include="resources"><UniqueIdentifier>{df567233-9d5b-4ead-bb7b-69e32e1cfff3}</UniqueIdentifier></Filter>
     <Filter Include="shared"><UniqueIdentifier>{2734b1f8-4bd5-4c37-9679-24f5d86f4380}</UniqueIdentifier></Filter>
@@ -96,6 +97,7 @@
     <ClInclude Include="..\src\proxy\tcp_forwards.h"><Filter>src\proxy</Filter></ClInclude>
     <ClInclude Include="..\src\proxy\vm_networks.h"><Filter>src\proxy</Filter></ClInclude>
     <ClInclude Include="..\src\runtime\profile.h"><Filter>src\runtime</Filter></ClInclude>
+    <ClInclude Include="..\src\runtime\network_setup.h"><Filter>src\runtime</Filter></ClInclude>
     <ClInclude Include="..\src\runtime\relay.h"><Filter>src\runtime</Filter></ClInclude>
     <ClInclude Include="..\src\runtime\tray.h"><Filter>src\runtime</Filter></ClInclude>
     <ClInclude Include="..\src\runtime\workspace.h"><Filter>src\runtime</Filter></ClInclude>
