@@ -33,6 +33,9 @@
     <ClCompile Include="..\src\file_drag\stream.cpp" />
     <ClCompile Include="..\src\file_drag\transfer.cpp" />
     <ClCompile Include="..\src\file_drag\upload.cpp" />
+    <ClCompile Include="..\src\remote_files\command.cpp" />
+    <ClCompile Include="..\src\remote_files\pipe.cpp" />
+    <ClCompile Include="..\src\remote_files\session.cpp" />
     <ClCompile Include="..\shared\crypto.cpp" />
     <ClCompile Include="..\shared\locate.cpp" />
     <ClCompile Include="..\shared\net_health.cpp" />

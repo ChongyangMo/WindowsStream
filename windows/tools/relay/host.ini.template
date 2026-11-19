@@ -15,6 +15,11 @@ bitrate_mbps=12
 clipboard=0
 file_drag=1
 exclusive_mouse=1
+remote_files_ini=..\remote-files.ini
+
+[administrator_permissions]
+clipboard=1
+file_drag=1
 
 [updates]
 enabled=0

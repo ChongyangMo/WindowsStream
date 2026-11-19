@@ -53,6 +53,9 @@ enum MessageType : uint8_t {
     MsgFileUploadData = 69,
     MsgFileUploadCancel = 70,
     MsgFileUploadResult = 71,
+    MsgRemoteFilesAvailable = 72,
+    MsgRemoteFilesRequest = 73,
+    MsgRemoteFilesResult = 74,
 };
 
 enum class ExclusiveMouseState : uint8_t { Unavailable, Available, Active, Failed };

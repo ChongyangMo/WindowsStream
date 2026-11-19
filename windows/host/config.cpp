@@ -1,6 +1,19 @@
 #include "config.h"
 #include <filesystem>
 
+namespace {
+bool IsElevated() {
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) return false;
+    TOKEN_ELEVATION elevation{};
+    DWORD bytes = 0;
+    const bool elevated = GetTokenInformation(token, TokenElevation, &elevation, sizeof elevation, &bytes) &&
+        elevation.TokenIsElevated != 0;
+    CloseHandle(token);
+    return elevated;
+}
+}
+
 bool LoadHostConfig(HostConfig& config, std::wstring& error) {
     const auto directory = PortableDir();
     if (directory.empty()) {
@@ -56,8 +69,12 @@ bool LoadHostConfig(HostConfig& config, std::wstring& error) {
         error = L"分辨率配置只能是 native 或 limited"; return false;
     }
     config.nativeResolution = _wcsicmp(buffer, L"native") == 0;
-    config.clipboard = GetPrivateProfileIntW(L"permissions", L"clipboard", 1, path.c_str()) != 0;
-    config.fileDrag = GetPrivateProfileIntW(L"permissions", L"file_drag", 1, path.c_str()) != 0;
+    config.elevated = IsElevated();
+    const auto sharing = config.elevated ? L"administrator_permissions" : L"permissions";
+    config.clipboard = GetPrivateProfileIntW(sharing, L"clipboard", 1, path.c_str()) != 0;
+    config.fileDrag = GetPrivateProfileIntW(sharing, L"file_drag", 1, path.c_str()) != 0;
+    GetPrivateProfileStringW(L"permissions", L"remote_files_ini", L"", buffer, 1024, path.c_str());
+    config.remoteFilesIni = *buffer ? (std::filesystem::path(directory) / buffer).lexically_normal().wstring() : path;
     config.exclusiveMouse = GetPrivateProfileIntW(L"permissions", L"exclusive_mouse", 0, path.c_str()) == 1;
     config.autoStart = GetPrivateProfileIntW(L"background", L"autostart", 1, path.c_str()) != 0;
     config.manageAutoStart = GetPrivateProfileIntW(L"background", L"manage_autostart", 1, path.c_str()) != 0;

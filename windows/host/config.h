@@ -7,8 +7,10 @@ struct HostConfig {
     uint16_t port = 7400;
     std::string token;
     bool reverse = true;
+    bool elevated = false;
     bool clipboard = true;
     bool fileDrag = true;
+    std::wstring remoteFilesIni;
     bool exclusiveMouse = false;
     int maxWidth = 1920;
     int maxHeight = 1080;

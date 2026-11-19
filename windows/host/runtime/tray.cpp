@@ -1,4 +1,5 @@
 #include "tray.h"
+#include "../version.h"
 #include "../../shared/host_control.h"
 #include "../../shared/app_icon.h"
 
@@ -8,7 +9,8 @@ bool HostTray::Add(HWND owner) {
     data_.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_SHOWTIP;
     data_.uCallbackMessage = kTrayCallback;
     data_.hIcon = LoadAppIcon(true);
-    wcscpy_s(data_.szTip, L"WindowsStream 被控端");
+    const auto text = L"WindowsStream 被控端 " + HostVersion();
+    wcsncpy_s(data_.szTip, text.c_str(), _TRUNCATE);
     added_ = Shell_NotifyIconW(NIM_ADD, &data_) != FALSE;
     if (added_) { data_.uVersion = NOTIFYICON_VERSION_4; Shell_NotifyIconW(NIM_SETVERSION, &data_); }
     else LogLine("添加托盘图标失败：%lu，将保留可见窗口", GetLastError());
@@ -20,7 +22,7 @@ void HostTray::Remove() {
 }
 void HostTray::Status(const std::wstring& status) {
     if (!added_) return;
-    const auto text = L"WindowsStream · " + status;
+    const auto text = L"WindowsStream " + HostVersion() + L" · " + status;
     wcsncpy_s(data_.szTip, text.c_str(), _TRUNCATE);
     data_.uFlags = NIF_TIP | NIF_SHOWTIP;
     Shell_NotifyIconW(NIM_MODIFY, &data_);

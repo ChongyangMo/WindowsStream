@@ -1,9 +1,11 @@
 #include "session.h"
+#include "version.h"
 #include "exclusive_mouse.h"
 #include "update/client.h"
 #include "update/apply.h"
 #include "runtime/autorun.h"
 #include "runtime/runtime.h"
+#include "ui/host_view.h"
 #include "proxy/client.h"
 #include "service/service.h"
 #include "locate/locator.h"
@@ -17,10 +19,10 @@
 namespace {
 constexpr UINT kStatus = WM_APP + 1;
 constexpr UINT_PTR kAddressTimer = 33;
+constexpr DWORD kWindowStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN;
 HostServer server;
 HostRuntime runtime;
-HWND statusLabel = nullptr;
-HWND addressField = nullptr;
+HostView view;
 std::wstring displayedAddress;
 
 std::wstring LocalAddress(const HostConfig& config) {
@@ -40,7 +42,7 @@ void RefreshLocalAddress(HWND window) {
     auto text = LocalAddress(*config);
     if (text.empty()) text = L"未确定连接地址";
     if (text == displayedAddress) return;
-    SetWindowTextW(addressField, text.c_str());
+    view.SetAddress(text);
     displayedAddress = std::move(text);
 }
 
@@ -51,22 +53,25 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         case WM_CREATE: {
             const auto* creation = reinterpret_cast<const CREATESTRUCTW*>(lParam);
             SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(creation->lpCreateParams));
-            statusLabel = CreateWindowW(L"STATIC", L"正在启动", WS_CHILD | WS_VISIBLE | SS_CENTER,
-                                        20, 16, 240, 20, window, nullptr, nullptr, nullptr);
-            const HWND addressLabel = CreateWindowW(L"STATIC", L"本机 IP", WS_CHILD | WS_VISIBLE | SS_CENTER,
-                                                   20, 44, 240, 20, window, nullptr, nullptr, nullptr);
-            addressField = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE |
-                ES_READONLY | ES_CENTER, 20, 66, 240, 24, window, nullptr, nullptr, nullptr);
-            for (const auto control : {addressLabel, addressField})
-                SendMessageW(control, WM_SETFONT, reinterpret_cast<WPARAM>(GetStockObject(DEFAULT_GUI_FONT)), TRUE);
+            if (!view.Create(window, *static_cast<const HostConfig*>(creation->lpCreateParams))) return -1;
             RefreshLocalAddress(window);
             SetTimer(window, kAddressTimer, 3000, nullptr);
-            CreateWindowW(L"BUTTON", L"隐藏", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                          40, 104, 90, 30, window, reinterpret_cast<HMENU>(1), nullptr, nullptr);
-            CreateWindowW(L"BUTTON", L"退出", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-                          150, 104, 90, 30, window, reinterpret_cast<HMENU>(2), nullptr, nullptr);
             return 0;
         }
+        case WM_DPICHANGED:
+            view.ResizeForDpi(LOWORD(wParam), reinterpret_cast<const RECT*>(lParam));
+            return 0;
+        case WM_PAINT:
+            view.Paint();
+            return 0;
+        case WM_ERASEBKGND:
+            return 1;
+        case WM_CTLCOLORSTATIC:
+            return reinterpret_cast<LRESULT>(view.ControlColor(reinterpret_cast<HDC>(wParam), reinterpret_cast<HWND>(lParam)));
+        case WM_SYSCOLORCHANGE:
+        case WM_SETTINGCHANGE:
+            view.SetColors();
+            break;
         case WM_SHOWWINDOW:
             if (wParam) RefreshLocalAddress(window);
             break;
@@ -76,14 +81,14 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             return 0;
         case kStatus: {
             std::unique_ptr<std::wstring> status(reinterpret_cast<std::wstring*>(lParam));
-            SetWindowTextW(statusLabel, status->c_str());
+            view.SetStatus(*status);
             runtime.Status(*status);
             if (IsWindowVisible(window)) RefreshLocalAddress(window);
             return 0;
         }
         case kHostExclusiveMouseStatus: {
             const wchar_t* status = wParam ? L"鼠标独占中 · Ctrl+Alt+F11 解除" : L"已连接";
-            SetWindowTextW(statusLabel, status);
+            view.SetStatus(status);
             runtime.Status(status);
             LogLine("%s", wParam ? "已启用远程独占鼠标" : "已恢复现场鼠标");
             return 0;
@@ -155,16 +160,18 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     type.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     type.hIcon = LoadAppIcon();
     RegisterClassW(&type);
-    RECT area{0, 0, 280, 154};
-    AdjustWindowRect(&area, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX, FALSE);
-    HWND window = CreateWindowW(type.lpszClassName, L"WindowsStream 被控端",
-                                WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+    const auto area = HostView::WindowBounds(kWindowStyle, GetDpiForSystem());
+    HWND window = CreateWindowW(type.lpszClassName, L"WindowsStream 被控端", kWindowStyle,
                                 CW_USEDEFAULT, CW_USEDEFAULT, area.right - area.left, area.bottom - area.top,
                                 nullptr, nullptr, instance, &config);
     if (!window) { WSACleanup(); CloseHandle(single); return 1; }
+    view.ResizeForDpi(GetDpiForWindow(window));
     runtime.Start(window, config, background || (updated && config.startHidden), show,
                   [window] { server.Stop(); DestroyWindow(window); }, [] { return server.Progress(); });
-    LogLine("Windows 被控端启动，模式：%s", config.reverse ? "主动连接控制端" : "等待控制端连接");
+    LogLine("WindowsStream 被控端版本：%s，模式：%s", WideToUtf8(HostVersion()).c_str(),
+        config.reverse ? "主动连接控制端" : "等待控制端连接");
+    LogLine("文字剪贴板：%s，双向文件拖拽：%s",
+        config.clipboard ? "已启用" : "已关闭", config.fileDrag ? "已启用" : "已关闭");
     HostUpdateClient updateClient;
     updateClient.Start(config, bootId);
     HostProxyClient proxyClient;

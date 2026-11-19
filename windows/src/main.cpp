@@ -5,6 +5,7 @@
 #include "video.h"
 #include "file_drag/gesture.h"
 #include "file_drag/upload.h"
+#include "remote_files/session.h"
 #include "runtime/relay.h"
 #include "updates/server.h"
 #include "proxy/server.h"
@@ -64,6 +65,7 @@ StreamDiagnostics g_diagnostics;
 std::deque<std::pair<int64_t, int64_t>> g_clockSamples;
 std::mutex g_connectionMutex;
 std::shared_ptr<Connection> g_connection;
+remotefiles::ViewerFiles g_remoteFiles;
 std::atomic<bool> g_running{true};
 std::thread g_networkThread;
 NetworkAccess g_networkAccess;
@@ -385,6 +387,7 @@ void NetworkLoop() {
         }
         g_fileDrag.Connect(g_window, connection);
         g_fileUpload.Connect(connection);
+        g_remoteFiles.Connect(connection);
         PostStatus(L"");
         connection->Send(MsgRequestKeyframe);
 
@@ -470,11 +473,12 @@ void NetworkLoop() {
                     break;
                 }
                 default:
-                    if (!g_fileUpload.Receive(type, payload)) g_fileDrag.Receive(type, payload);
+                    if (!g_remoteFiles.Receive(type, payload) && !g_fileUpload.Receive(type, payload)) g_fileDrag.Receive(type, payload);
                     break;
             }
         }
         g_fileDrag.Disconnect();
+        g_remoteFiles.Disconnect();
         connection->Shutdown();
         g_fileUpload.Disconnect();
         PostMessageW(g_window, WM_APP_EXCLUSIVE_MOUSE_STATE, 0, 0);
@@ -929,6 +933,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
+    const int remoteFilesResult = remotefiles::DispatchCommand();
+    if (remoteFilesResult >= 0) return remoteFilesResult;
     const int setupResult = network_setup::Dispatch();
     if (setupResult >= 0) return setupResult;
     const int guardResult = proxy::RunProxyGuard();
@@ -1039,6 +1045,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
         LogLine("连接口令至少需要 32 个字节，请检查配置文件");
         UpdateTitle();
     } else {
+        g_remoteFiles.Start(ConfigPath());
         g_networkThread = std::thread(NetworkLoop);
     }
 
@@ -1064,6 +1071,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     g_networkAccess.Stop();
     if (auto connection = CurrentConnection()) connection->Shutdown();
     if (g_networkThread.joinable()) g_networkThread.join();
+    g_remoteFiles.Stop();
     g_fileUpload.Stop();
     Connection::CloseReverseListener();
     g_video.Shutdown();

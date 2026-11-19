@@ -18,6 +18,14 @@ bitrate_mbps = 48
 clipboard = 1
 file_drag = 1
 
+[administrator_permissions]
+clipboard = 1
+file_drag = 1
+
+[remote_files]
+; Configured aliases allow listing and reading log files in the selected directory.
+; vito = C:\lvi\log
+
 [updates]
 enabled = 1
 port = 7402

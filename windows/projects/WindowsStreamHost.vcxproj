@@ -26,6 +26,7 @@
   <Import Project="WindowsStream.props" />
   <ItemDefinitionGroup>
     <Link><AdditionalDependencies>d3d11.lib;dxgi.lib;mfplat.lib;mfuuid.lib;wmcodecdspuuid.lib;strmiids.lib;winmm.lib;winhttp.lib;wtsapi32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
+    <ResourceCompile><AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories></ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\host\file_drag\drop_target.cpp" />
@@ -37,6 +38,7 @@
     <ClCompile Include="..\host\channel.cpp" />
     <ClCompile Include="..\host\clipboard.cpp" />
     <ClCompile Include="..\host\config.cpp" />
+    <ClCompile Include="..\host\remote_files.cpp" />
     <ClCompile Include="..\host\cursor.cpp" />
     <ClCompile Include="..\host\discovery.cpp" />
     <ClCompile Include="..\host\encoder_gpu_software.cpp" />
@@ -50,6 +52,7 @@
     <ClCompile Include="..\host\input_diagnostics.cpp" />
     <ClCompile Include="..\host\locate\locator.cpp" />
     <ClCompile Include="..\host\main.cpp" />
+    <ClCompile Include="..\host\ui\host_view.cpp" />
     <ClCompile Include="..\host\proxy\packet_relay.cpp" />
     <ClCompile Include="..\host\proxy\proxy_client.cpp" />
     <ClCompile Include="..\host\runtime\autorun.cpp" />
@@ -101,6 +104,7 @@
     <ClInclude Include="..\host\gpu_convert.h" />
     <ClInclude Include="..\host\input.h" />
     <ClInclude Include="..\host\input_diagnostics.h" />
+    <ClInclude Include="..\host\ui\host_view.h" />
     <ClInclude Include="..\host\locate\locator.h" />
     <ClInclude Include="..\host\proxy\client.h" />
     <ClInclude Include="..\host\proxy\packet_relay.h" />
@@ -135,6 +139,10 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Import Project="WindowsStream.targets" />
+  <Target Name="GenerateHostVersion" BeforeTargets="ResourceCompile">
+    <MakeDir Directories="$(IntDir)" />
+    <Exec Command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(WindowsRoot)tools\relay\write-host-version.ps1&quot; -OutputPath &quot;$(IntDir)host_version_generated.h&quot;" />
+  </Target>
   <Target Name="BuildPortableHost" AfterTargets="CopyPortableFiles"
           Condition="'$(Configuration)'=='Release' and '$(OutDir)'=='$(ReleaseDirectory)\host\.runtime\'">
     <Exec Command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(WindowsRoot)tools\relay\prepare-universal.ps1&quot; -Release &quot;$(ReleaseDirectory)&quot; -HostProgram &quot;$(TargetPath)&quot;" />

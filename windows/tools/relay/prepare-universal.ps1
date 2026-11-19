@@ -80,15 +80,27 @@ $replacement = @{}
 $replacement[(Join-Path $goRoot 'cmd/host-package/payload.zip')] = $payload
 [IO.File]::WriteAllText($overlay, (@{Replace=$replacement} | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
 $standalone = Join-Path $hostOutput 'WindowsStream-Host.exe'
+$pending = Join-Path $hostOutput ('.windowsstream-host-' + [guid]::NewGuid().ToString('N') + '.exe')
 Push-Location -LiteralPath $goRoot
 try {
-    & $go build -buildvcs=false -trimpath -mod=readonly -tags hostpackage -ldflags '-H=windowsgui' -overlay $overlay -o $standalone ./cmd/host-package
+    & $go build -buildvcs=false -trimpath -mod=readonly -tags hostpackage -ldflags '-H=windowsgui' -overlay $overlay -o $pending ./cmd/host-package
     if ($LASTEXITCODE -ne 0) { throw '被控端启动程序构建失败。' }
-} finally { Pop-Location }
+    & (Join-Path $PSScriptRoot 'copy-host-version.ps1') -Source $hostProgram -Destination $pending
+    if ([IO.File]::Exists($standalone)) {
+        [IO.File]::Replace($pending, $standalone, [NullString]::Value)
+    } else {
+        [IO.File]::Move($pending, $standalone)
+    }
+} finally {
+    Pop-Location
+    [IO.File]::Delete($pending)
+}
+& (Join-Path $PSScriptRoot 'build-admin-launcher.ps1') -Launcher $standalone
 $oldLauncher = Join-Path $hostOutput 'WindowsStream-RelayHost.exe'
 if (Test-Path -LiteralPath $oldLauncher -PathType Leaf) { [IO.File]::Delete($oldLauncher) }
 foreach ($folder in @($staging, $controllerRuntime, (Join-Path $hostOutput '.runtime'))) {
     $runtime = Get-Item -LiteralPath $folder -Force -ErrorAction SilentlyContinue
     if ($runtime) { $runtime.Attributes = $runtime.Attributes -bor [IO.FileAttributes]::Hidden }
 }
-Write-Output '已生成统一版被控端。'
+$version = [Diagnostics.FileVersionInfo]::GetVersionInfo($hostProgram).FileVersion
+Write-Output "已生成 WindowsStream 被控端 $version。"

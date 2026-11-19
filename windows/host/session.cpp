@@ -1,4 +1,5 @@
 #include "session.h"
+#include "version.h"
 #include "stream.h"
 #include "clipboard.h"
 #include "cursor.h"
@@ -8,6 +9,7 @@
 #include "discovery.h"
 #include "file_drag/sender.h"
 #include "file_drag/receiver.h"
+#include "remote_files.h"
 #include "locate/locator.h"
 #include "service/service.h"
 #include <cstdio>
@@ -24,6 +26,10 @@ std::string AverageMicros(uint64_t elapsed, uint64_t samples) {
 bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
            HWND owner, std::atomic<bool>& running, std::atomic<unsigned>& progress, bool& gpuRecovered) {
     CursorSender cursor;
+    const auto version = "WindowsStream 被控端版本：" + WideToUtf8(HostVersion());
+    Writer versionInfo;
+    versionInfo.append(version.data(), version.size());
+    if (!channel.Send(MsgHostInfo, versionInfo)) return false;
     const auto description = stream.Description();
     LogLine("视频链路：%s", description.c_str());
     Writer info;
@@ -35,6 +41,8 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
     filedrag::Sender fileDrag(channel);
     filedrag::Receiver fileReceiver(channel);
     if (config.fileDrag && !servermode::SecureAgent() && (!fileDrag.Start() || !fileReceiver.Start())) return false;
+    RemoteFilesHost remoteFiles(channel);
+    if (!remoteFiles.Start(!servermode::SecureAgent(), config.remoteFilesIni)) return false;
     const bool allowExclusiveMouse = config.exclusiveMouse && !servermode::SecureAgent();
     const auto sendMouseState = [&](ExclusiveMouseState state, DWORD error = ERROR_SUCCESS) {
         Writer status;
@@ -105,7 +113,7 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
                     // 首版按被控端真实主屏和配置输出，不修改分辨率或创建虚拟屏。
                     break;
                 default:
-                    if (!fileReceiver.Handle(type, payload) && !fileDrag.Handle(type, payload, input)) {
+                    if (!remoteFiles.Handle(type, payload) && !fileReceiver.Handle(type, payload) && !fileDrag.Handle(type, payload, input)) {
                         const bool submitted = input.Handle(type, payload);
                         if (type == MsgMouseButton && !servermode::SecureAgent())
                             report(inputDiagnostics.MouseButton(payload, submitted, exclusiveMouse.Active()));
