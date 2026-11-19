@@ -57,20 +57,7 @@ func launch() (string, error) {
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return "", err
 	}
-	app, err := installPayload(root)
-	if err != nil {
-		return "", fmt.Errorf("无法准备被控端程序：%w", err)
-	}
-	if configured {
-		return "", startHost(app, source)
-	}
-	if err := configureIdentity(root, source, app); err != nil {
-		return "", fmt.Errorf("无法准备本机配对：%w", err)
-	}
-	if err := startHost(app, ""); err != nil {
-		return "", err
-	}
-	return exportPair(app, source, root)
+	return launchVariant(root, source, configured)
 }
 
 func hasHostConfig(source string) (bool, error) {
@@ -103,7 +90,7 @@ func acquireLaunchMutex() (windows.Handle, error) {
 	return handle, nil
 }
 
-func startHost(app, installTo string) error {
+func startHost(app, installTo string, admin bool) error {
 	system, err := windows.GetSystemDirectory()
 	if err != nil {
 		return err
@@ -112,6 +99,9 @@ func startHost(app, installTo string) error {
 	args := []string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", filepath.Join(app, "start-host.ps1"), "-Package"}
 	if installTo != "" {
 		args = append(args, "-InstallTo", installTo)
+	}
+	if admin {
+		args = append(args, "-AdminRelay")
 	}
 	command := exec.Command(powershell, args...)
 	command.Dir = app

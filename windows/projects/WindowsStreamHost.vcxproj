@@ -25,7 +25,7 @@
   </PropertyGroup>
   <Import Project="WindowsStream.props" />
   <ItemDefinitionGroup>
-    <Link><AdditionalDependencies>d3d11.lib;dxgi.lib;mfplat.lib;mfuuid.lib;wmcodecdspuuid.lib;strmiids.lib;winmm.lib;winhttp.lib;wtsapi32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
+    <Link><AdditionalDependencies>d3d11.lib;dxgi.lib;mfplat.lib;mfuuid.lib;wmcodecdspuuid.lib;strmiids.lib;winmm.lib;winhttp.lib;wtsapi32.lib;taskschd.lib;comsuppw.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
     <ResourceCompile><AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories></ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -59,13 +59,16 @@
     <ClCompile Include="..\host\runtime\awake.cpp" />
     <ClCompile Include="..\host\runtime\idle_pulse.cpp" />
     <ClCompile Include="..\host\runtime\keepalive.cpp" />
+    <ClCompile Include="..\host\runtime\keepalive_task.cpp" />
     <ClCompile Include="..\host\runtime\lock_policy.cpp" />
     <ClCompile Include="..\host\runtime\power_watch.cpp" />
     <ClCompile Include="..\host\runtime\recovery.cpp" />
     <ClCompile Include="..\host\runtime\runtime.cpp" />
+    <ClCompile Include="..\host\runtime\task_scheduler.cpp" />
     <ClCompile Include="..\host\runtime\tray.cpp" />
     <ClCompile Include="..\host\service\agent.cpp" />
     <ClCompile Include="..\host\service\attention.cpp" />
+    <ClCompile Include="..\host\service\consent.cpp" />
     <ClCompile Include="..\host\service\desktop.cpp" />
     <ClCompile Include="..\host\service\launcher.cpp" />
     <ClCompile Include="..\host\service\supervisor.cpp" />
@@ -75,6 +78,7 @@
     <ClCompile Include="..\host\update\client.cpp" />
     <ClCompile Include="..\host\update\stage.cpp" />
     <ClCompile Include="..\shared\crypto.cpp" />
+    <ClCompile Include="..\shared\consent_cipher.cpp" />
     <ClCompile Include="..\shared\locate.cpp" />
     <ClCompile Include="..\shared\net_health.cpp" />
     <ClCompile Include="..\shared\proxy\authentication.cpp" />
@@ -112,6 +116,7 @@
     <ClInclude Include="..\host\runtime\awake.h" />
     <ClInclude Include="..\host\runtime\idle_pulse.h" />
     <ClInclude Include="..\host\runtime\keepalive.h" />
+    <ClInclude Include="..\host\runtime\keepalive_task.h" />
     <ClInclude Include="..\host\runtime\lock_policy.h" />
     <ClInclude Include="..\host\runtime\power_watch.h" />
     <ClInclude Include="..\host\runtime\runtime.h" />
@@ -124,6 +129,7 @@
     <ClInclude Include="..\host\update\client.h" />
     <ClInclude Include="..\shared\app_icon.h" />
     <ClInclude Include="..\shared\crypto.h" />
+    <ClInclude Include="..\shared\consent_cipher.h" />
     <ClInclude Include="..\shared\host_control.h" />
     <ClInclude Include="..\shared\locate.h" />
     <ClInclude Include="..\shared\net_health.h" />

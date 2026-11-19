@@ -3,6 +3,8 @@
 #include <filesystem>
 
 uint64_t ProcessCreation(HANDLE process);
+std::filesystem::path PrepareKeepAliveProgram();
+bool TakeRecoveryAttempt(const std::filesystem::path& root);
 int RunRecovery(DWORD parent, uint64_t created, HANDLE parentHandle, HANDLE stopHandle, HANDLE uiBeat, HANDLE workerBeat);
 
 class KeepAlive {

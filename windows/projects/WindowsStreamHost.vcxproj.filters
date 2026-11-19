@@ -40,13 +40,16 @@
     <ClCompile Include="..\host\runtime\awake.cpp"><Filter>host\runtime</Filter></ClCompile>
     <ClCompile Include="..\host\runtime\idle_pulse.cpp"><Filter>host\runtime</Filter></ClCompile>
     <ClCompile Include="..\host\runtime\keepalive.cpp"><Filter>host\runtime</Filter></ClCompile>
+    <ClCompile Include="..\host\runtime\keepalive_task.cpp"><Filter>host\runtime</Filter></ClCompile>
     <ClCompile Include="..\host\runtime\lock_policy.cpp"><Filter>host\runtime</Filter></ClCompile>
     <ClCompile Include="..\host\runtime\power_watch.cpp"><Filter>host\runtime</Filter></ClCompile>
     <ClCompile Include="..\host\runtime\recovery.cpp"><Filter>host\runtime</Filter></ClCompile>
     <ClCompile Include="..\host\runtime\runtime.cpp"><Filter>host\runtime</Filter></ClCompile>
+    <ClCompile Include="..\host\runtime\task_scheduler.cpp"><Filter>host\runtime</Filter></ClCompile>
     <ClCompile Include="..\host\runtime\tray.cpp"><Filter>host\runtime</Filter></ClCompile>
     <ClCompile Include="..\host\service\agent.cpp"><Filter>host\service</Filter></ClCompile>
     <ClCompile Include="..\host\service\attention.cpp"><Filter>host\service</Filter></ClCompile>
+    <ClCompile Include="..\host\service\consent.cpp"><Filter>host\service</Filter></ClCompile>
     <ClCompile Include="..\host\service\desktop.cpp"><Filter>host\service</Filter></ClCompile>
     <ClCompile Include="..\host\service\launcher.cpp"><Filter>host\service</Filter></ClCompile>
     <ClCompile Include="..\host\service\supervisor.cpp"><Filter>host\service</Filter></ClCompile>
@@ -56,6 +59,7 @@
     <ClCompile Include="..\host\update\client.cpp"><Filter>host\update</Filter></ClCompile>
     <ClCompile Include="..\host\update\stage.cpp"><Filter>host\update</Filter></ClCompile>
     <ClCompile Include="..\shared\crypto.cpp"><Filter>shared</Filter></ClCompile>
+    <ClCompile Include="..\shared\consent_cipher.cpp"><Filter>shared</Filter></ClCompile>
     <ClCompile Include="..\shared\locate.cpp"><Filter>shared</Filter></ClCompile>
     <ClCompile Include="..\shared\net_health.cpp"><Filter>shared</Filter></ClCompile>
     <ClCompile Include="..\shared\proxy\authentication.cpp"><Filter>shared\proxy</Filter></ClCompile>
@@ -88,6 +92,7 @@
     <ClInclude Include="..\host\runtime\awake.h"><Filter>host\runtime</Filter></ClInclude>
     <ClInclude Include="..\host\runtime\idle_pulse.h"><Filter>host\runtime</Filter></ClInclude>
     <ClInclude Include="..\host\runtime\keepalive.h"><Filter>host\runtime</Filter></ClInclude>
+    <ClInclude Include="..\host\runtime\keepalive_task.h"><Filter>host\runtime</Filter></ClInclude>
     <ClInclude Include="..\host\runtime\lock_policy.h"><Filter>host\runtime</Filter></ClInclude>
     <ClInclude Include="..\host\runtime\power_watch.h"><Filter>host\runtime</Filter></ClInclude>
     <ClInclude Include="..\host\runtime\runtime.h"><Filter>host\runtime</Filter></ClInclude>
@@ -100,6 +105,7 @@
     <ClInclude Include="..\host\update\client.h"><Filter>host\update</Filter></ClInclude>
     <ClInclude Include="..\shared\app_icon.h"><Filter>shared</Filter></ClInclude>
     <ClInclude Include="..\shared\crypto.h"><Filter>shared</Filter></ClInclude>
+    <ClInclude Include="..\shared\consent_cipher.h"><Filter>shared</Filter></ClInclude>
     <ClInclude Include="..\shared\host_control.h"><Filter>shared</Filter></ClInclude>
     <ClInclude Include="..\shared\locate.h"><Filter>shared</Filter></ClInclude>
     <ClInclude Include="..\shared\net_health.h"><Filter>shared</Filter></ClInclude>

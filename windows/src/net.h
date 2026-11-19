@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "../shared/consent_cipher.h"
 
 struct ServerInfo {
     int width = 0;
@@ -35,6 +36,7 @@ public:
     bool Send(uint8_t type, const void* data = nullptr, size_t size = 0);
     void Shutdown();
     bool Wireless() const { return wireless_; }  // 到 Windows 的路由是否走无线网卡
+    bool ConsentProtected() const { return consent_.Active(); }
 
 private:
     bool Handshake(const std::string& token, const ClientDisplay& display, ServerInfo& info, std::wstring& error);
@@ -44,4 +46,5 @@ private:
     static SOCKET reverseListener_;  // 网络线程复用监听器，避免重连时反复绑定端口
     bool wireless_ = false;
     std::mutex sendMutex_;
+    ConsentCipher consent_;
 };

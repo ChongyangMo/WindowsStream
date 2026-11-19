@@ -4,6 +4,7 @@
 #include "update/client.h"
 #include "update/apply.h"
 #include "runtime/autorun.h"
+#include "runtime/keepalive_task.h"
 #include "runtime/runtime.h"
 #include "ui/host_view.h"
 #include "proxy/client.h"
@@ -126,12 +127,16 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
         LocalFree(arguments);
         return LaunchRelayAutoStart();
     }
+    if (arguments && argumentCount == 2 && std::wstring_view(arguments[1]) == kScheduledKeepAliveArgument) {
+        LocalFree(arguments);
+        return RunScheduledKeepAlive();
+    }
     std::string bootId;
     const bool background = arguments && argumentCount == 2 && std::wstring(arguments[1]) == L"--background";
     const bool updated = arguments && argumentCount == 3 && std::wstring(arguments[1]) == L"--updated";
     if (updated) bootId = WideToUtf8(arguments[2]);
     if (arguments) LocalFree(arguments);
-    HANDLE single = CreateMutexW(nullptr, TRUE, L"Local\\WindowsStreamHost");
+    HANDLE single = CreateMutexW(nullptr, TRUE, kHostInstanceMutex);
     if (!single || GetLastError() == ERROR_ALREADY_EXISTS) {
         if (single) CloseHandle(single);
         if (!updates::BootstrapExisting() && !background) {
@@ -145,7 +150,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     HostConfig config;
     std::wstring error;
     if (!LoadHostConfig(config, error)) {
-        MessageBoxW(nullptr, error.c_str(), L"WindowsStream", MB_OK | MB_ICONERROR);
+        if (background) LogLine("后台启动被控端失败：%s", WideToUtf8(error).c_str());
+        else MessageBoxW(nullptr, error.c_str(), L"WindowsStream", MB_OK | MB_ICONERROR);
         CloseHandle(single);
         return 1;
     }

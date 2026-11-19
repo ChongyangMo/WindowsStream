@@ -18,6 +18,7 @@ struct EncodedFrame {
     uint64_t enqueueMicros = 0;
     bool keyframe = false;
     bool refine = false;  // 静止画面的补清晰帧：不计入帧率与延迟
+    bool protectedInput = false;
     // 本帧变化的图块（有则让这些块退回视频显示）
     bool hasDirty = false;
     uint32_t dirtySerial = 0;
@@ -51,6 +52,7 @@ public:
     // 当前视频帧尺寸（用于鼠标坐标映射），未收到画面时为 0。
     int FrameWidth() const { return frameWidth_.load(); }
     int FrameHeight() const { return frameHeight_.load(); }
+    bool ProtectedInput() const { return protectedInput_.load(); }
 
     VideoStats TakeStats();
     std::function<void()> onDecodeError;         // 需要请求关键帧时回调（视频线程）
@@ -143,6 +145,7 @@ private:
 
     std::atomic<int> frameWidth_{0};
     std::atomic<int> frameHeight_{0};
+    std::atomic<bool> protectedInput_{false};
     std::mutex statsMutex_;
     VideoStats stats_;
 };

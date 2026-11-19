@@ -104,13 +104,14 @@ bool HostChannel::Open(const HostConfig& config, const std::wstring& controller,
     return true;
 }
 
-bool HostChannel::Authenticate(const std::string& token, int width, int height, int fps) {
-    uint8_t nonce[32]{};
+bool HostChannel::Authenticate(const std::string& token, int width, int height, int fps, bool consent) {
+    uint8_t nonce[kConsentNonceSize]{};
     if (BCryptGenRandom(nullptr, nonce, sizeof nonce, BCRYPT_USE_SYSTEM_PREFERRED_RNG) < 0) return false;
+    const auto version = consent ? kConsentProtocolVersion : kProtocolVersion;
     Writer hello;
-    hello.u32(kProtocolVersion);
+    hello.u32(version);
     hello.append(nonce, sizeof nonce);
-    const std::string context = "windowsstream-host-v2";
+    const std::string context = consent ? kConsentHostProof : "windowsstream-host-v2";
     Writer proof;
     proof.append(context.data(), context.size());
     proof.append(nonce, sizeof nonce);
@@ -121,9 +122,17 @@ bool HostChannel::Authenticate(const std::string& token, int width, int height, 
     uint8_t type = 0;
     std::vector<uint8_t> payload;
     uint8_t expected[32]{};
-    bool ok = Read(type, payload) && type == MsgClientAuth && payload.size() == 47 &&
-              ReadU32(payload.data() + 32) == kProtocolVersion &&
-              HmacSha256(token, nonce, sizeof nonce, expected) && SecureEqual(expected, payload.data(), 32);
+    constexpr size_t authSize = 47;
+    const auto expectedSize = consent ? authSize + kConsentNonceSize : authSize;
+    bool ok = Read(type, payload) && type == MsgClientAuth && payload.size() == expectedSize &&
+              ReadU32(payload.data() + 32) == version;
+    if (ok && consent) {
+        const auto* viewerNonce = payload.data() + authSize;
+        ok = ConsentViewerProof(token, nonce, viewerNonce, expected) &&
+             SecureEqual(expected, payload.data(), 32) && consent_.Initialize(token, nonce, viewerNonce, true);
+    } else if (ok) {
+        ok = HmacSha256(token, nonce, sizeof nonce, expected) && SecureEqual(expected, payload.data(), 32);
+    }
     Writer result;
     result.u8(ok ? 1 : 0);
     result.u16(static_cast<uint16_t>(width));
@@ -152,22 +161,30 @@ bool HostChannel::Read(uint8_t& type, std::vector<uint8_t>& payload) {
     uint8_t header[5]{};
     if (!ReadExact(header, sizeof header)) return false;
     const uint32_t length = ReadU32(header);
-    if (length > 4 * 1024 * 1024) {
+    if (length > 4 * 1024 * 1024 + (consent_.Active() ? kConsentRecordOverhead : 0)) {
         LogLine("拒绝过大的控制消息：%u 字节", length);
         return false;
     }
     type = header[4];
     payload.resize(length);
-    return !length || ReadExact(payload.data(), length);
+    if (length && !ReadExact(payload.data(), length)) return false;
+    return !consent_.Active() || (type == MsgConsentRecord && consent_.Open(type, payload));
 }
 
 bool HostChannel::Send(uint8_t type, const Writer& payload) {
     if (payload.bytes.size() > 32 * 1024 * 1024) return false;
-    Writer frame;
-    frame.u32(static_cast<uint32_t>(payload.bytes.size()));
-    frame.u8(type);
-    frame.append(payload.bytes.data(), payload.bytes.size());
     std::lock_guard lock(sendMutex_);
+    const auto* data = &payload.bytes;
+    std::vector<uint8_t> sealed;
+    if (consent_.Active()) {
+        if (!consent_.Seal(type, data->data(), data->size(), sealed)) return false;
+        type = MsgConsentRecord;
+        data = &sealed;
+    }
+    Writer frame;
+    frame.u32(static_cast<uint32_t>(data->size()));
+    frame.u8(type);
+    frame.append(data->data(), data->size());
     const char* cursor = reinterpret_cast<const char*>(frame.bytes.data());
     size_t remaining = frame.bytes.size();
     while (remaining) {

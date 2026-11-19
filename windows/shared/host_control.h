@@ -4,6 +4,7 @@
 constexpr UINT kHostShowWindow = WM_APP + 21;
 constexpr UINT kHostExitForUpdate = WM_APP + 22;
 constexpr UINT kHostExitCommand = 41002;
+inline constexpr wchar_t kHostInstanceMutex[] = L"Local\\WindowsStreamHost";
 
 // 恢复与升级共用此锁，避免同时终止或启动同一个被控端。
 class HostUpdateLock {

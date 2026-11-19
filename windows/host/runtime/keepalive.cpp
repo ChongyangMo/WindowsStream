@@ -7,26 +7,33 @@ uint64_t ProcessCreation(HANDLE process) {
     if (!GetProcessTimes(process, &created, &exit, &kernel, &user)) return 0;
     return static_cast<uint64_t>(created.dwHighDateTime) << 32 | created.dwLowDateTime;
 }
+std::filesystem::path PrepareKeepAliveProgram() {
+    const auto module = updates::ModulePath();
+    updates::Package package;
+    if (!updates::LoadPackage(module, package)) return {};
+    const auto hash = updates::Hex(package.hash.data(), package.hash.size());
+    const auto root = std::filesystem::path(module).parent_path();
+    const auto folder = root / L".windowsstream-runtime" / Utf8ToWide(hash);
+    std::error_code error;
+    std::filesystem::create_directories(folder, error);
+    if (error) return {};
+    const auto helper = folder / L"WindowsStreamKeepAlive.exe";
+    updates::Package existing;
+    if (!updates::LoadPackage(helper, existing) || !SecureEqual(existing.hash.data(), package.hash.data(), 32)) {
+        if (!CopyFileW(module.c_str(), helper.c_str(), FALSE)) return {};
+    }
+    return helper;
+}
+
 bool KeepAlive::Start() {
     if (child_ && WaitForSingleObject(child_, 0) == WAIT_TIMEOUT) return true;
     if (child_) {
         LogLine("被控端守护进程意外停止，正在恢复守护");
         Stop();
     }
-    const auto module = updates::ModulePath();
-    updates::Package package;
-    if (!updates::LoadPackage(module, package)) return false;
-    const auto hash = updates::Hex(package.hash.data(), package.hash.size());
-    const auto root = std::filesystem::path(module).parent_path();
-    const auto folder = root / L".windowsstream-runtime" / Utf8ToWide(hash);
-    std::error_code error;
-    std::filesystem::create_directories(folder, error);
-    if (error) return false;
-    const auto helper = folder / L"WindowsStreamKeepAlive.exe";
-    updates::Package existing;
-    if (!updates::LoadPackage(helper, existing) || !SecureEqual(existing.hash.data(), package.hash.data(), 32)) {
-        if (!CopyFileW(module.c_str(), helper.c_str(), FALSE)) return false;
-    }
+    const auto helper = PrepareKeepAliveProgram();
+    if (helper.empty()) return false;
+    const auto root = helper.parent_path().parent_path().parent_path();
     const auto created = ProcessCreation(GetCurrentProcess());
     if (!created) return false;
     SECURITY_ATTRIBUTES security{sizeof security, nullptr, TRUE};

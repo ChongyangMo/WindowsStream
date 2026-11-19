@@ -1,4 +1,4 @@
-param([switch]$Package, [switch]$Background, [string]$InstallTo)
+param([switch]$Package, [switch]$Background, [string]$InstallTo, [switch]$AdminRelay)
 
 $ErrorActionPreference = 'Stop'
 if ($Package) { [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false) }
@@ -11,10 +11,17 @@ try {
     $hostConfig = Join-Path $folder 'host.ini'
     $relayConfig = Join-Path $folder 'relay.ini'
     Invoke-StreamLock 'Local\WindowsStreamHostUpdate' {
-        if (!$InstallTo) { Initialize-RelayHost $folder }
+        if (!$InstallTo -and (!$AdminRelay -or !(Test-Path -LiteralPath $hostConfig) -or
+            (Test-Path -LiteralPath (Join-Path $folder 'identity.ini')))) {
+            Initialize-RelayHost $folder
+        }
         Assert-StreamFiles @($hostConfig)
         $relay = Test-Path -LiteralPath $relayConfig
         if ($relay -and (Read-RelaySection $relayConfig 'relay').role -ne 'host') { throw '中转配置必须使用被控端角色。' }
+        if ($relay -and $AdminRelay) {
+            . (Join-Path $PSScriptRoot 'install-admin-consent.ps1')
+            Install-AdminConsentRelay $folder
+        }
         $old = @(foreach ($entry in Get-StreamProcesses 'WindowsStreamHost.exe') {
             if ($entry.Instance.CommandLine -match '\s--(?:server-\S+|apply-update|stop-user-host|relay-autostart)(?:\s|$)') {
                 $entry.Process.Dispose()

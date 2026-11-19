@@ -42,7 +42,7 @@ DWORD InteractiveSession() {
     if (selected == 0xffffffff) selected = WTSGetActiveConsoleSessionId();
     return selected == 0 ? 0xffffffff : selected;
 }
-bool LaunchAgent(DWORD session, const std::wstring& attentionEvent, PROCESS_INFORMATION& process) {
+bool LaunchAgent(DWORD session, const std::wstring& attentionEvent, PROCESS_INFORMATION& process, bool consent) {
     HANDLE source = nullptr, token = nullptr;
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_DUPLICATE | TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES, &source)) return false;
     const bool privileges = Enable(source, SE_TCB_NAME) && Enable(source, SE_ASSIGNPRIMARYTOKEN_NAME) && Enable(source, SE_INCREASE_QUOTA_NAME);
@@ -55,18 +55,21 @@ bool LaunchAgent(DWORD session, const std::wstring& attentionEvent, PROCESS_INFO
     if (ok) {
         ok = SetTokenInformation(token, TokenSessionId, &session, sizeof session) != FALSE;
         DWORD uiAccess = TRUE;
-        if (ok) ok = SetTokenInformation(token, TokenUIAccess, &uiAccess, sizeof uiAccess) != FALSE;
+        if (ok && !consent) ok = SetTokenInformation(token, TokenUIAccess, &uiAccess, sizeof uiAccess) != FALSE;
         if (ok) {
             wchar_t module[MAX_PATH]{};
             const DWORD size = GetModuleFileNameW(nullptr, module, MAX_PATH);
             if (!size || size >= MAX_PATH) ok = false;
             else {
-                std::wstring command = L"\"" + std::wstring(module) + L"\" --server-agent \"" + attentionEvent + L"\"";
-                wchar_t desktop[32]{};
-                const auto section = L"session." + std::to_wstring(session);
-                const auto runtime = PortableDir() + L"\\service-runtime.ini";
-                GetPrivateProfileStringW(section.c_str(), L"desktop", L"Winlogon", desktop, 32, runtime.c_str());
-                if (std::wstring(desktop) != L"Default" && std::wstring(desktop) != L"Winlogon") wcscpy_s(desktop, L"Winlogon");
+                std::wstring command = L"\"" + std::wstring(module) + L"\"" +
+                    (consent ? L" --consent-agent" : L" --server-agent \"" + attentionEvent + L"\"");
+                wchar_t desktop[32] = L"Winlogon";
+                if (!consent) {
+                    const auto section = L"session." + std::to_wstring(session);
+                    const auto runtime = PortableDir() + L"\\service-runtime.ini";
+                    GetPrivateProfileStringW(section.c_str(), L"desktop", L"Winlogon", desktop, 32, runtime.c_str());
+                    if (std::wstring(desktop) != L"Default" && std::wstring(desktop) != L"Winlogon") wcscpy_s(desktop, L"Winlogon");
+                }
                 std::wstring station = L"winsta0\\" + std::wstring(desktop);
                 STARTUPINFOW startup{sizeof startup}; startup.lpDesktop = station.data();
                 LogLine("服务器会话代理启动桌面：%s，会话 %lu", WideToUtf8(station).c_str(), session);

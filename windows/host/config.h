@@ -1,5 +1,6 @@
 #pragma once
 #include "../src/common.h"
+#include <filesystem>
 
 struct HostConfig {
     std::wstring controllerHost;
@@ -32,3 +33,4 @@ struct HostConfig {
 };
 
 bool LoadHostConfig(HostConfig& config, std::wstring& error);
+void ReadHostAutoStart(const std::filesystem::path& ini, HostConfig& config);

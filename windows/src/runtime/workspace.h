@@ -10,6 +10,7 @@ constexpr UINT kWorkspaceFullscreen = 42105;
 constexpr UINT kWorkspaceSecureAttention = 42106;
 constexpr UINT kWorkspaceExclusiveMouse = 42107;
 constexpr wchar_t kExclusiveMouseStateProperty[] = L"WindowsStream.ExclusiveMouseState";
+constexpr wchar_t kCaptureStatusProperty[] = L"WindowsStream.CaptureStatus";
 
 struct ViewerStartup {
     std::wstring config;

@@ -1,4 +1,5 @@
 #include "service.h"
+#include <wtsapi32.h>
 
 namespace servermode {
 namespace {
@@ -9,6 +10,7 @@ std::wstring Name(HDESK desktop) {
 }
 bool DesktopBinding::Attach() {
     if (!SecureAgent()) return true;
+    if (ConsentAgent()) return ConsentActive();
     auto input = OpenInputDesktop(0, FALSE, DESKTOP_READOBJECTS | DESKTOP_WRITEOBJECTS |
         DESKTOP_CREATEWINDOW | DESKTOP_CREATEMENU | DESKTOP_HOOKCONTROL | DESKTOP_SWITCHDESKTOP);
     if (!input) return false;
@@ -32,5 +34,18 @@ bool DesktopAccessible() {
     const auto name = Name(input);
     CloseDesktop(input);
     return !name.empty() && (SecureAgent() ? name == Name(GetThreadDesktop(GetCurrentThreadId())) : _wcsicmp(name.c_str(), L"Default") == 0);
+}
+
+CaptureStatus QueryCapturePauseStatus() {
+    wchar_t* buffer = nullptr;
+    DWORD size = 0;
+    if (WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION, WTSSessionInfoEx, &buffer, &size)) {
+        const auto* info = reinterpret_cast<const WTSINFOEXW*>(buffer);
+        const bool locked = info && size >= sizeof(*info) && info->Level == 1 &&
+            info->Data.WTSInfoExLevel1.SessionFlags == WTS_SESSIONSTATE_LOCK;
+        WTSFreeMemory(buffer);
+        if (locked) return CaptureStatus::Locked;
+    }
+    return DesktopAccessible() ? CaptureStatus::Unavailable : CaptureStatus::DesktopUnavailable;
 }
 }

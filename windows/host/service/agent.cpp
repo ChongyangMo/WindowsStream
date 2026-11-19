@@ -5,7 +5,7 @@
 
 namespace servermode {
 namespace { bool secureAgent = false; std::wstring attentionEvent; }
-bool SecureAgent() { return secureAgent; }
+bool SecureAgent() { return secureAgent || ConsentAgent(); }
 bool LocalSystem() {
     HANDLE token = nullptr;
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) return false;
@@ -54,9 +54,11 @@ int Dispatch() {
     if (arguments) LocalFree(arguments);
     if (command == L"--server-service") return RunService();
     if (command == L"--server-agent") return RunAgent(eventName);
+    if (command == L"--consent-service") return RunService(true);
+    if (command == L"--consent-agent") return RunConsentAgent();
     if (command == L"--stop-user-host") {
         const auto window = FindWindowW(L"WindowsStreamHostWindow", nullptr);
-        return window && !PostMessageW(window, kHostExitForUpdate, 0, 0) ? 1 : 0;
+        return window && !PostMessageW(window, WM_COMMAND, kHostExitCommand, 0) ? 1 : 0;
     }
     return -1;
 }

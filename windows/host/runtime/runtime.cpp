@@ -1,5 +1,6 @@
 #include "runtime.h"
 #include "autorun.h"
+#include "keepalive_task.h"
 #include "../../shared/host_control.h"
 
 bool HostRuntime::Awake(bool enabled) {
@@ -29,6 +30,7 @@ void HostRuntime::Start(HWND window, const HostConfig& config, bool background, 
     power_.Start(window_);
     const bool hidden = config_.tray && tray_.Add(window_) && background;
     ShowWindow(window_, hidden ? SW_HIDE : show == SW_HIDE ? SW_SHOWNOACTIVATE : show);
+    StartScheduledKeepAlive(PortableDir());
     LogLine("托盘常驻：%s；登录自启 %s，保持唤醒 %s，异常恢复 %s", tray_.Added() ? "已启用" : "未启用",
         config_.manageAutoStart ? (config_.autoStart ? "开" : "关") : "由外部管理",
         config_.keepAwake ? "开" : "关", config_.watchdog ? (guardReady ? "开" : "等待重试") : "关");
@@ -45,6 +47,7 @@ void HostRuntime::Status(const std::wstring& status) { status_ = status; tray_.S
 void HostRuntime::Exit(const char* reason) {
     if (exiting_) return;
     exiting_ = true;
+    if (!updateHandoff_) PauseScheduledKeepAlive(PortableDir());
     LogLine("被控端结束：%s，不触发异常恢复", reason);
     Stop();
     if (quit_) quit_();

@@ -48,12 +48,20 @@ func hostConnection(c config, state *relayLog) (bool, error) {
 	if status != paired {
 		return false, fmt.Errorf("设备已有中转连接，状态 %d", status)
 	}
-	local, err := net.DialTimeout("tcp", c.local, 2*time.Second)
+	address := c.local
+	if c.consent != "" && consentReady(c.device) {
+		address = c.consent
+	}
+	local, err := net.DialTimeout("tcp", address, 2*time.Second)
 	if err != nil {
 		return false, fmt.Errorf("本机被控端未监听：%w", err)
 	}
 	defer local.Close()
 	state.changed("中转已配对，正在转发 WindowsStream 连接")
+	if c.consent != "" {
+		stop := watchConsent(c.device, address == c.consent, local)
+		defer stop()
+	}
 	bridge(local, socket)
 	return true, nil
 }

@@ -333,6 +333,7 @@ void VideoPipeline::Run() {
     auto& trace = ControllerTrace();
     CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     ClearBackground();
+    bool decodingProtected = false;
     for (;;) {
         std::deque<Item> items;
         bool resize = false, redraw = false, resetOverlay = false;
@@ -373,6 +374,14 @@ void VideoPipeline::Run() {
                 continue;
             }
             const TraceActivity decoding(trace.videoWork, static_cast<uint16_t>(VideoWork::Decode));
+            if (item.frame.protectedInput != decodingProtected) {
+                decoder_->ProcessMessage(MFT_MESSAGE_COMMAND_FLUSH, 0);
+                decoder_->ProcessMessage(MFT_MESSAGE_NOTIFY_START_OF_STREAM, 0);
+                lastSample_.Reset();
+                latest.Reset();
+                ClearBackground();
+                decodingProtected = item.frame.protectedInput;
+            }
             ApplyDirty(item.frame);
             if (item.frame.enqueueMicros && decodeStart >= item.frame.enqueueMicros) {
                 queueMicros += decodeStart - item.frame.enqueueMicros;
@@ -399,6 +408,7 @@ void VideoPipeline::Run() {
         if (latest) {
             lastSample_ = latest;
             const bool presented = Render(lastSample_.Get());
+            if (presented) protectedInput_.store(decodingProtected);
             uint64_t renderEnd = NowMicros();
             if (newest && !newest->refine) {
                 diagFrames_ += videoItems;

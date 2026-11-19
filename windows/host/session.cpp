@@ -23,6 +23,17 @@ std::string AverageMicros(uint64_t elapsed, uint64_t samples) {
     return text;
 }
 
+bool ReportCaptureStatus(HostChannel& channel, CaptureStatus status) {
+    for (const auto& entry : kCaptureStatusText) {
+        if (entry.status != status) continue;
+        LogLine("%s", entry.message.data());
+        Writer payload;
+        payload.append(entry.message.data(), entry.message.size());
+        return channel.Send(MsgHostInfo, payload);
+    }
+    return true;
+}
+
 bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
            HWND owner, std::atomic<bool>& running, std::atomic<unsigned>& progress, bool& gpuRecovered) {
     CursorSender cursor;
@@ -53,6 +64,7 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
     if (allowExclusiveMouse && !sendMouseState(ExclusiveMouseState::Available)) return false;
     std::atomic<bool> connected{true};
     std::atomic<bool> forceKeyframe{true};
+    std::atomic<bool> consentFrameSent{false};
     std::thread receiver([&] {
         InputInjector input;
         InputDiagnostics inputDiagnostics;
@@ -113,6 +125,12 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
                     // 首版按被控端真实主屏和配置输出，不修改分辨率或创建虚拟屏。
                     break;
                 default:
+                    if (servermode::ConsentAgent() && type == MsgKey) {
+                        if (consentFrameSent && servermode::ConsentInput(type, payload)) input.Handle(type, payload);
+                        SecureZeroMemory(payload.data(), payload.size());
+                        break;
+                    }
+                    if (servermode::ConsentAgent() && (!consentFrameSent || !servermode::ConsentInput(type, payload))) break;
                     if (!remoteFiles.Handle(type, payload) && !fileReceiver.Handle(type, payload) && !fileDrag.Handle(type, payload, input)) {
                         const bool submitted = input.Handle(type, payload);
                         if (type == MsgMouseButton && !servermode::SecureAgent())
@@ -143,6 +161,8 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
     uint64_t lastClipboard = 0, lastCursor = 0, lastStats = next, frames = 0, bytes = 0, sendMicros = 0;
     const uint64_t interval = 1000000 / stream.Fps();
     bool videoFailed = false, networkFailed = false;
+    auto captureStatus = CaptureStatus::Ready;
+    uint64_t nextCaptureStatusQuery = 0;
     VideoEncoder::Sink sink = [&](const uint8_t* data, size_t size, uint64_t timestamp, bool keyframe) {
         Writer video;
         video.u64(timestamp);
@@ -150,11 +170,13 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
         video.append(data, size);
         const auto started = NowMicros();
         if (!channel.Send(MsgVideo, video)) { networkFailed = true; return false; }
+        if (servermode::ConsentAgent()) consentFrameSent = true;
         sendMicros += NowMicros() - started;
         ++frames; bytes += video.bytes.size() + 5;
         return true;
     };
     while (running && connected) {
+        if (servermode::ConsentAgent() && !servermode::ConsentActive()) break;
         progress.fetch_add(1, std::memory_order_relaxed);
         if (gpuBack) {
             gpuRecovered = true;
@@ -166,18 +188,20 @@ bool Serve(HostChannel& channel, FrameStream& stream, const HostConfig& config,
         if (now >= next) {
             bool submitted = false;
             const bool request = forceKeyframe.exchange(false);
-            const bool wasPaused = stream.CapturePaused();
             if (!stream.Capture(request, submitted, sink)) {
                 if (stream.CaptureLost()) LogLine("采集源中断（合盖、屏幕关闭或桌面切换），保留当前编码配置重新建立连接");
                 videoFailed = !networkFailed && !stream.CaptureLost();
                 break;
             }
-            if (wasPaused != stream.CapturePaused()) {
-                const std::string message = wasPaused ? "画面采集已恢复" : "画面采集暂不可用，控制连接保持";
-                LogLine("%s", message.c_str());
-                Writer status;
-                status.append(message.data(), message.size());
-                if (!channel.Send(MsgHostInfo, status)) break;
+            auto status = captureStatus;
+            if (!stream.CapturePaused()) status = CaptureStatus::Ready;
+            else if (captureStatus == CaptureStatus::Ready || now >= nextCaptureStatusQuery) {
+                status = servermode::QueryCapturePauseStatus();
+                nextCaptureStatusQuery = now + 500000;
+            }
+            if (captureStatus != status) {
+                captureStatus = status;
+                if (!ReportCaptureStatus(channel, status)) break;
             }
             if (request && !submitted) forceKeyframe = true;
             // 落后时跳到最新采样时刻，不堆积过期桌面或补发一串历史帧。
@@ -269,7 +293,11 @@ void HostServer::Run(const HostConfig& config, HWND owner, const std::function<v
         while (running_) {
             progress_.fetch_add(1, std::memory_order_relaxed);
             if (!desktop.Attach()) {
-                LogLine("服务器桌面切换暂未完成，重新启动会话代理：%lu", GetLastError());
+                const auto error = GetLastError();
+                HostChannel::CloseListener();
+                MFShutdown();
+                CoUninitialize();
+                LogLine("服务器桌面切换暂未完成，重新启动会话代理：%lu", error);
                 return;
             }
             FrameStream stream;
@@ -295,7 +323,7 @@ void HostServer::Run(const HostConfig& config, HWND owner, const std::function<v
                 channel_ = channel;
                 if (!running_) channel->Shutdown();
             }
-            if (running_ && channel->Authenticate(config.token, stream.Width(), stream.Height(), stream.Fps())) {
+            if (running_ && channel->Authenticate(config.token, stream.Width(), stream.Height(), stream.Fps(), servermode::ConsentAgent())) {
                 {
                     std::lock_guard lock(mutex_);
                     connectedLocalAddress_ = channel->LocalAddress();

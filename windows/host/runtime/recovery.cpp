@@ -18,6 +18,8 @@ void RecoveryLog(const std::filesystem::path& root, const std::string& message) 
         WriteFile(file, line.data(), static_cast<DWORD>(line.size()), &written, nullptr); CloseHandle(file);
     }
 }
+}
+
 bool TakeRecoveryAttempt(const std::filesystem::path& root) {
     constexpr ULONGLONG window = 10 * 60 * 1000;
     const auto path = root / L".windowsstream-runtime" / L"recovery-state.ini";
@@ -36,6 +38,7 @@ bool TakeRecoveryAttempt(const std::filesystem::path& root) {
     return saved;
 }
 
+namespace {
 bool Enabled(const std::filesystem::path& ini) {
     return GetPrivateProfileIntW(L"background", L"watchdog", 1, ini.c_str()) != 0;
 }
@@ -112,7 +115,7 @@ int RunRecovery(DWORD parentId, uint64_t created, HANDLE parent, HANDLE stop, HA
     while (WaitForSingleObject(stop, 2000) == WAIT_TIMEOUT && Enabled(ini)) {
         const HostUpdateLock updateLock(0);
         if (!updateLock) continue;
-        HANDLE active = OpenMutexW(SYNCHRONIZE, FALSE, L"Local\\WindowsStreamHost");
+        HANDLE active = OpenMutexW(SYNCHRONIZE, FALSE, kHostInstanceMutex);
         if (active) { CloseHandle(active); return 0; }
         if (!TakeRecoveryAttempt(root)) return 0;
         std::wstring command = L"\"" + target.wstring() + L"\" --background";

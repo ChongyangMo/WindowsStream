@@ -1,5 +1,5 @@
 ﻿param(
-    [string]$Launcher = (Join-Path $PSScriptRoot '../../build/2release/host/WindowsStream-Host.exe'),
+    [Parameter(Mandatory)][string]$Launcher,
     [string]$ManifestTool
 )
 
@@ -19,7 +19,7 @@ if (!$ManifestTool) {
 $manifest = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../../resources/host-admin.manifest')).Path
 $folder = Split-Path -Parent $source
 $destination = Join-Path $folder 'WindowsStream-Host-Admin.exe'
-if ($source -eq $destination) { throw '请选择普通版 WindowsStream-Host.exe 作为源文件。' }
+if ($source -eq $destination) { throw '管理员版启动程序的输入与输出不能相同。' }
 $pending = Join-Path $folder ('.windowsstream-admin-' + [guid]::NewGuid().ToString('N') + '.exe')
 try {
     [IO.File]::Copy($source, $pending)

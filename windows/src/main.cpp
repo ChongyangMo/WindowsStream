@@ -20,6 +20,7 @@
 #include "runtime/profile.h"
 #include "runtime/workspace.h"
 #include "../shared/app_icon.h"
+#include "../shared/capture_status.h"
 
 #include <imm.h>
 #include <shlobj.h>
@@ -34,7 +35,7 @@ namespace {
 
 constexpr UINT WM_APP_CURSOR = WM_APP + 1;     // lParam = HCURSOR
 constexpr UINT WM_APP_CLIPBOARD = WM_APP + 2;  // lParam = std::wstring*
-constexpr UINT WM_APP_STATUS = WM_APP + 3;     // lParam = std::wstring*
+constexpr UINT WM_APP_STATUS = WM_APP + 3;     // wParam = CaptureStatus, lParam = std::wstring*
 constexpr UINT WM_APP_WINKEY = WM_APP + 4;     // wParam = down, lParam = 是否右 Win
 constexpr UINT WM_APP_TOGGLE_OVERLAY = WM_APP + 5;     // 切换无损层显示（Ctrl+Alt+L 或外部诊断）
 constexpr UINT WM_APP_TOGGLE_FULLSCREEN = WM_APP + 6;  // 切换全屏（外部诊断用，等同 Ctrl+Alt+Enter）
@@ -135,17 +136,20 @@ std::shared_ptr<Connection> CurrentConnection() {
 
 bool Connected() { return CurrentConnection() != nullptr; }
 
-void SendToHost(uint8_t type, const Writer& writer) {
+void SendToHost(uint8_t type, const Writer& writer, const std::shared_ptr<Connection>& connection) {
     auto& trace = ControllerTrace();
     const TraceActivity sending(trace.sendWork, type);
-    const auto connection = CurrentConnection();
     const bool ok = connection && connection->Send(type, writer.bytes.data(), writer.bytes.size());
     trace.Sent(type, ok, static_cast<bool>(connection));
 }
 
-void PostStatus(const std::wstring& text) {
+void SendToHost(uint8_t type, const Writer& writer) {
+    SendToHost(type, writer, CurrentConnection());
+}
+
+void PostStatus(const std::wstring& text, CaptureStatus capture = CaptureStatus::Ready) {
     auto* copy = new std::wstring(text);
-    if (!PostMessageW(g_window, WM_APP_STATUS, 0, reinterpret_cast<LPARAM>(copy))) {
+    if (!PostMessageW(g_window, WM_APP_STATUS, static_cast<WPARAM>(capture), reinterpret_cast<LPARAM>(copy))) {
         delete copy;
     }
 }
@@ -391,6 +395,8 @@ void NetworkLoop() {
         PostStatus(L"");
         connection->Send(MsgRequestKeyframe);
 
+        const bool consent = connection->ConsentProtected();
+        bool consentVideoShown = false;
         uint8_t type = 0;
         std::vector<uint8_t> payload;
         while (g_running) {
@@ -406,6 +412,7 @@ void NetworkLoop() {
                 case MsgVideo:
                     if (payload.size() > 9) {
                         EncodedFrame frame;
+                        frame.protectedInput = consent;
                         frame.captureMicros = ReadU64(payload.data());
                         uint8_t flags = payload[8];
                         frame.keyframe = (flags & 1) != 0;
@@ -426,6 +433,10 @@ void NetworkLoop() {
                         }
                         frame.data.assign(payload.begin() + offset, payload.end());
                         g_video.Submit(std::move(frame));
+                        if (consent && !consentVideoShown) {
+                            consentVideoShown = true;
+                            PostStatus(kConsentInputLabel, CaptureStatus::Consent);
+                        }
                     }
                     break;
                 case MsgLossless:
@@ -454,6 +465,13 @@ void NetworkLoop() {
                         const std::string text(payload.begin(), payload.end());
                         if (text.starts_with("系统未接受键鼠操作")) trace.Event("被控端报告键鼠注入失败");
                         LogLine("被控端：%s", text.c_str());
+                        if (!consent) {
+                            for (const auto& entry : kCaptureStatusText) {
+                                if (text != entry.message) continue;
+                                PostStatus(entry.status == CaptureStatus::Ready ? L"" : Utf8ToWide(text), entry.status);
+                                break;
+                            }
+                        }
                     }
                     break;
                 case MsgTelemetry:
@@ -513,6 +531,9 @@ bool MapPoint(int x, int y, uint16_t& nx, uint16_t& ny) {
 }
 
 void SendKey(int remoteKey, bool down) {
+    const auto connection = CurrentConnection();
+    // 桌面重连时，旧画面的按键不能被转发到另一种连接。
+    if (!connection || connection->ConsentProtected() != g_video.ProtectedInput()) return;
     if (down) {
         g_pressedRemoteKeys.insert(remoteKey);
     } else {
@@ -521,7 +542,8 @@ void SendKey(int remoteKey, bool down) {
     Writer w;
     w.u16(static_cast<uint16_t>(remoteKey));
     w.u8(down ? 1 : 0);
-    SendToHost(MsgKey, w);
+    SendToHost(MsgKey, w, connection);
+    if (connection->ConsentProtected()) SecureZeroMemory(w.bytes.data(), w.bytes.size());
 }
 
 void SendButton(int button, bool down, LPARAM lParam) {
@@ -608,13 +630,15 @@ std::wstring ReplaceAll(std::wstring text, const std::wstring& from, const std::
 void OnLocalClipboardChanged() {
     if (!ViewerHasFocus(g_window)) return;
     if (!g_profile.clipboard) return;
-    if (GetClipboardSequenceNumber() == g_ownClipboardSequence || !Connected()) return;
+    const auto connection = CurrentConnection();
+    if (!connection || connection->ConsentProtected() || g_video.ProtectedInput() ||
+        GetClipboardSequenceNumber() == g_ownClipboardSequence) return;
     std::string utf8 = WideToUtf8(ReplaceAll(ReadClipboardText(), L"\r\n", L"\n"));
     if (utf8.empty() || utf8 == g_lastClipboard || utf8.size() > 4 * 1024 * 1024) return;
     g_lastClipboard = utf8;
     Writer w;
     w.append(utf8.data(), utf8.size());
-    SendToHost(MsgClipboard, w);
+    SendToHost(MsgClipboard, w, connection);
 }
 
 void ApplyRemoteClipboard(const std::wstring& text) {
@@ -847,6 +871,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
         case WM_APP_STATUS: {
             std::unique_ptr<std::wstring> text(reinterpret_cast<std::wstring*>(lParam));
             g_status = *text;
+            if (reinterpret_cast<ULONG_PTR>(GetPropW(hwnd, kCaptureStatusProperty)) != wParam) {
+                if (wParam) SetPropW(hwnd, kCaptureStatusProperty, reinterpret_cast<HANDLE>(wParam));
+                else RemovePropW(hwnd, kCaptureStatusProperty);
+                if (const auto parent = GetParent(hwnd)) RedrawWindow(parent, nullptr, nullptr, RDW_INVALIDATE | RDW_ALLCHILDREN);
+            }
             UpdateTitle();
             return 0;
         }

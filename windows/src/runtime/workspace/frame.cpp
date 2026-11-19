@@ -1,5 +1,6 @@
 #include "window.h"
 #include "../../../shared/app_icon.h"
+#include "../../../shared/capture_status.h"
 #include <windowsx.h>
 #include <set>
 
@@ -123,8 +124,16 @@ void Window::DrawTab(const DRAWITEMSTRUCT& item) {
     RECT text = item.rcItem; const int padding = HeaderHeight() / 3; text.left += padding; text.right -= padding * 3;
     const auto& tab = tabs_[index];
     const auto state = static_cast<ExclusiveMouseState>(reinterpret_cast<ULONG_PTR>(GetPropW(tab.view, kExclusiveMouseStateProperty)));
-    const auto name = (state == ExclusiveMouseState::Active ? L"独占 · " :
-        state == ExclusiveMouseState::Failed ? L"独占失败 · " : L"") + tab.profile.name;
+    std::wstring name;
+    const auto capture = static_cast<CaptureStatus>(reinterpret_cast<ULONG_PTR>(GetPropW(tab.view, kCaptureStatusProperty)));
+    if (capture == CaptureStatus::Consent) name = std::wstring(kConsentInputLabel) + L" · ";
+    else if (capture != CaptureStatus::Ready) {
+        for (const auto& entry : kCaptureStatusText) {
+            if (entry.status == capture) { name = std::wstring(entry.label) + L" · "; break; }
+        }
+    } else if (state == ExclusiveMouseState::Active) name = L"独占 · ";
+    else if (state == ExclusiveMouseState::Failed) name = L"独占失败 · ";
+    name += tab.profile.name;
     DrawTextW(item.hDC, name.c_str(), -1, &text, DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS | DT_NOPREFIX);
     const int x = item.rcItem.right - padding * 2, y = (item.rcItem.top + item.rcItem.bottom) / 2;
     const int radius = std::max(3, padding / 3);

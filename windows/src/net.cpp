@@ -176,42 +176,53 @@ bool Connection::Handshake(const std::string& token, const ClientDisplay& displa
         error = L"握手失败：服务端没有正确响应";
         return false;
     }
-    uint32_t version = ReadU32(payload.data());
-    if (version != kProtocolVersion) {
+    const uint32_t version = ReadU32(payload.data());
+    const bool consent = version == kConsentProtocolVersion;
+    if (version != kProtocolVersion && !consent) {
         error = L"协议版本不一致（Windows 端 " + std::to_wstring(version) + L"）";
         return false;
     }
-    const std::string context = "windowsstream-host-v2";
+    const std::string context = consent ? kConsentHostProof : "windowsstream-host-v2";
+    const auto* hostNonce = payload.data() + 4;
     Writer proof;
     proof.append(context.data(), context.size());
-    proof.append(payload.data() + 4, 32);
+    proof.append(hostNonce, kConsentNonceSize);
     uint8_t expected[32]{};
     if (!HmacSha256(token, proof.bytes.data(), proof.bytes.size(), expected) ||
         !SecureEqual(expected, payload.data() + 36, 32)) {
         error = L"被控端身份验证失败";
         return false;
     }
-    uint8_t mac[32];
-    if (!HmacSha256(token, payload.data() + 4, 32, mac)) {
+    uint8_t mac[32]{}, viewerNonce[kConsentNonceSize]{};
+    const bool proved = consent
+        ? BCryptGenRandom(nullptr, viewerNonce, sizeof viewerNonce, BCRYPT_USE_SYSTEM_PREFERRED_RNG) >= 0 &&
+          ConsentViewerProof(token, hostNonce, viewerNonce, mac)
+        : HmacSha256(token, hostNonce, kConsentNonceSize, mac);
+    if (!proved) {
         error = L"计算认证码失败";
         return false;
     }
     Writer auth;
     auth.append(mac, sizeof mac);
-    auth.u32(kProtocolVersion);
+    auth.u32(version);
     auth.u16(display.viewWidth);
     auth.u16(display.viewHeight);
     auth.u16(display.monitorWidth);
     auth.u16(display.monitorHeight);
     auth.u16(display.refresh);
     auth.u8(wireless_ ? 1 : 0);
+    if (consent) auth.append(viewerNonce, sizeof viewerNonce);
     if (!Send(MsgClientAuth, auth.bytes.data(), auth.bytes.size())) {
         error = L"发送连接认证失败";
         return false;
     }
+    if (consent && !consent_.Initialize(token, hostNonce, viewerNonce, false)) {
+        error = L"无法建立 UAC 加密连接";
+        return false;
+    }
 
     if (!Read(type, payload) || type != MsgAuthResult || payload.empty() || payload[0] != 1 || payload.size() < 7) {
-        error = L"认证失败：token 不匹配";
+        error = consent ? L"UAC 加密连接认证失败" : L"认证失败：token 不匹配";
         return false;
     }
     info.width = ReadU16(payload.data() + 1);
@@ -243,16 +254,25 @@ bool Connection::Read(uint8_t& type, std::vector<uint8_t>& payload) {
         return false;
     }
     uint32_t length = ReadU32(header);
-    if (length > 32 * 1024 * 1024) {
+    if (length > 32 * 1024 * 1024 + (consent_.Active() ? kConsentRecordOverhead : 0)) {
         LogLine("消息过大：%u 字节", length);
         return false;
     }
     type = header[4];
     payload.resize(length);
-    return length == 0 || ReadExact(payload.data(), length);
+    if (length && !ReadExact(payload.data(), length)) return false;
+    return !consent_.Active() || (type == MsgConsentRecord && consent_.Open(type, payload));
 }
 
 bool Connection::Send(uint8_t type, const void* data, size_t size) {
+    std::lock_guard lock(sendMutex_);
+    std::vector<uint8_t> sealed;
+    if (consent_.Active()) {
+        if (!consent_.Seal(type, data, size, sealed)) return false;
+        type = MsgConsentRecord;
+        data = sealed.data();
+        size = sealed.size();
+    }
     std::vector<uint8_t> frame(5 + size);
     frame[0] = static_cast<uint8_t>(size);
     frame[1] = static_cast<uint8_t>(size >> 8);
@@ -262,7 +282,6 @@ bool Connection::Send(uint8_t type, const void* data, size_t size) {
     if (size > 0) {
         memcpy(frame.data() + 5, data, size);
     }
-    std::lock_guard lock(sendMutex_);
     const char* p = reinterpret_cast<const char*>(frame.data());
     size_t remaining = frame.size();
     while (remaining > 0) {

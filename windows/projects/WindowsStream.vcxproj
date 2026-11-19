@@ -37,6 +37,7 @@
     <ClCompile Include="..\src\remote_files\pipe.cpp" />
     <ClCompile Include="..\src\remote_files\session.cpp" />
     <ClCompile Include="..\shared\crypto.cpp" />
+    <ClCompile Include="..\shared\consent_cipher.cpp" />
     <ClCompile Include="..\shared\locate.cpp" />
     <ClCompile Include="..\shared\net_health.cpp" />
     <ClCompile Include="..\shared\proxy\authentication.cpp" />
@@ -88,6 +89,7 @@
     <ClInclude Include="..\src\file_drag\upload.h" />
     <ClInclude Include="..\shared\app_icon.h" />
     <ClInclude Include="..\shared\crypto.h" />
+    <ClInclude Include="..\shared\consent_cipher.h" />
     <ClInclude Include="..\shared\host_control.h" />
     <ClInclude Include="..\shared\locate.h" />
     <ClInclude Include="..\shared\net_health.h" />

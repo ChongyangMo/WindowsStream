@@ -57,7 +57,7 @@ function Copy-Launcher([string]$Name, [string]$Folder) {
 
 Copy-Item -LiteralPath $hostProgram -Destination $hostFolder -Force
 if ($bridgeProgram -ne $hostBridge) { Copy-Item -LiteralPath $bridgeProgram -Destination $hostBridge -Force }
-$scripts = @('takeover.ps1','pairing.ps1','start-host.ps1','install-configured.ps1')
+$scripts = @('takeover.ps1','pairing.ps1','start-host.ps1','install-configured.ps1','install-admin-consent.ps1')
 foreach ($launcher in $scripts) {
     Copy-Launcher $launcher $hostFolder
 }
@@ -81,6 +81,7 @@ $replacement[(Join-Path $goRoot 'cmd/host-package/payload.zip')] = $payload
 [IO.File]::WriteAllText($overlay, (@{Replace=$replacement} | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
 $standalone = Join-Path $hostOutput 'WindowsStream-Host.exe'
 $pending = Join-Path $hostOutput ('.windowsstream-host-' + [guid]::NewGuid().ToString('N') + '.exe')
+$pendingAdmin = Join-Path $hostOutput ('.windowsstream-admin-payload-' + [guid]::NewGuid().ToString('N') + '.exe')
 Push-Location -LiteralPath $goRoot
 try {
     & $go build -buildvcs=false -trimpath -mod=readonly -tags hostpackage -ldflags '-H=windowsgui' -overlay $overlay -o $pending ./cmd/host-package
@@ -91,11 +92,15 @@ try {
     } else {
         [IO.File]::Move($pending, $standalone)
     }
+    & $go build -buildvcs=false -trimpath -mod=readonly -tags 'hostpackage,hostadmin' -ldflags '-H=windowsgui' -overlay $overlay -o $pendingAdmin ./cmd/host-package
+    if ($LASTEXITCODE -ne 0) { throw '管理员版被控端启动程序构建失败。' }
+    & (Join-Path $PSScriptRoot 'copy-host-version.ps1') -Source $hostProgram -Destination $pendingAdmin
+    & (Join-Path $PSScriptRoot 'build-admin-launcher.ps1') -Launcher $pendingAdmin
 } finally {
     Pop-Location
     [IO.File]::Delete($pending)
+    [IO.File]::Delete($pendingAdmin)
 }
-& (Join-Path $PSScriptRoot 'build-admin-launcher.ps1') -Launcher $standalone
 $oldLauncher = Join-Path $hostOutput 'WindowsStream-RelayHost.exe'
 if (Test-Path -LiteralPath $oldLauncher -PathType Leaf) { [IO.File]::Delete($oldLauncher) }
 foreach ($folder in @($staging, $controllerRuntime, (Join-Path $hostOutput '.runtime'))) {

@@ -21,6 +21,7 @@ enum MessageType : uint8_t {
     MsgServerHello = 1,
     MsgClientAuth = 2,
     MsgAuthResult = 3,
+    MsgConsentRecord = 4,
     MsgVideo = 10,
     MsgCursor = 11,
     MsgLossless = 12,

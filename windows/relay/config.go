@@ -21,6 +21,7 @@ type config struct {
 	local      string
 	enrollment string
 	viewerHash string
+	consent    string
 }
 
 func loadConfig(path string) (config, error) {
@@ -36,6 +37,7 @@ func loadConfig(path string) (config, error) {
 		"http_proxy": &c.httpProxy, "device": &c.device, "token": &c.token,
 		"local_address": &c.local,
 		"enrollment":    &c.enrollment, "viewer_sha256": &c.viewerHash,
+		"consent_address": &c.consent,
 	}
 	scanner := bufio.NewScanner(file)
 	for lineNumber := 1; scanner.Scan(); lineNumber++ {
@@ -81,6 +83,14 @@ func loadConfig(path string) (config, error) {
 	}
 	if !strings.HasPrefix(c.local, "127.0.0.1:") {
 		return c, fmt.Errorf("本地中转地址只能使用回环地址")
+	}
+	if c.consent != "" {
+		host, port, err := net.SplitHostPort(c.consent)
+		number, invalid := strconv.ParseUint(port, 10, 16)
+		if c.role != "host" || host != "127.0.0.1" || err != nil || invalid != nil ||
+			number == 0 || c.consent == c.local {
+			return c, fmt.Errorf("UAC 中转地址无效")
+		}
 	}
 	key, err := hex.DecodeString(c.token)
 	if err != nil || len(key) != 32 {

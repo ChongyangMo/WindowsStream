@@ -2,7 +2,8 @@
 
 namespace servermode {
 namespace {
-constexpr wchar_t kName[] = L"WindowsStreamServer";
+const wchar_t* serviceName = L"WindowsStreamServer";
+bool consentMode = false;
 SERVICE_STATUS_HANDLE statusHandle = nullptr;
 HANDLE stop = nullptr;
 SERVICE_STATUS state{};
@@ -22,13 +23,13 @@ DWORD WINAPI Control(DWORD control, DWORD, void*, void*) {
     return ERROR_CALL_NOT_IMPLEMENTED;
 }
 void WINAPI Main(DWORD, wchar_t**) {
-    statusHandle = RegisterServiceCtrlHandlerExW(kName, Control, nullptr);
+    statusHandle = RegisterServiceCtrlHandlerExW(serviceName, Control, nullptr);
     if (!statusHandle) return;
     stop = CreateEventW(nullptr, TRUE, FALSE, nullptr);
     if (!stop || !LocalSystem()) { Status(SERVICE_STOPPED, ERROR_ACCESS_DENIED); if (stop) CloseHandle(stop); return; }
     std::wstring attentionName;
-    const HANDLE attention = CreateAttentionEvent(attentionName);
-    if (!attention) { Status(SERVICE_STOPPED, GetLastError()); CloseHandle(stop); return; }
+    const HANDLE attention = consentMode ? nullptr : CreateAttentionEvent(attentionName);
+    if (!consentMode && !attention) { Status(SERVICE_STOPPED, GetLastError()); CloseHandle(stop); return; }
     HANDLE job = nullptr;
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
     limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
@@ -36,17 +37,18 @@ void WINAPI Main(DWORD, wchar_t**) {
     PROCESS_INFORMATION child{}; DWORD active = 0xffffffff, lastError = 0;
     const HANDLE events[]{stop, attention};
     for (;;) {
-        const DWORD signal = WaitForMultipleObjects(2, events, FALSE, 1000);
+        const DWORD signal = WaitForMultipleObjects(attention ? 2 : 1, events, FALSE, 1000);
         if (signal == WAIT_OBJECT_0 || signal == WAIT_FAILED) break;
         if (signal == WAIT_OBJECT_0 + 1) { SendAttention(child.hProcess); continue; }
-        const DWORD session = InteractiveSession();
+        DWORD session = InteractiveSession();
+        if (consentMode && !ConsentSession(session)) session = 0xffffffff;
         if (child.hProcess && (session != active || WaitForSingleObject(child.hProcess, 0) != WAIT_TIMEOUT)) {
             TerminateProcess(child.hProcess, 0); WaitForSingleObject(child.hProcess, 5000);
             CloseHandle(child.hProcess); CloseHandle(child.hThread); child = {};
             if (job) { CloseHandle(job); job = nullptr; }
         }
         if (child.hProcess || session == 0xffffffff) continue;
-        if (LaunchAgent(session, attentionName, child)) {
+        if (LaunchAgent(session, attentionName, child, consentMode)) {
             // 作业对象不能跨交互会话复用；每个会话代理使用独立回收组。
             job = CreateJobObjectW(nullptr, nullptr);
             if (!job || !SetInformationJobObject(job, JobObjectExtendedLimitInformation, &limits, sizeof limits) ||
@@ -72,11 +74,14 @@ void WINAPI Main(DWORD, wchar_t**) {
         CloseHandle(child.hProcess); CloseHandle(child.hThread);
     }
     LogLine("服务器服务已停止，交互会话代理已回收");
-    CloseHandle(attention); CloseHandle(stop); stop = nullptr; Status(SERVICE_STOPPED);
+    if (attention) CloseHandle(attention);
+    CloseHandle(stop); stop = nullptr; Status(SERVICE_STOPPED);
 }
 }
-int RunService() {
-    SERVICE_TABLE_ENTRYW table[]{{const_cast<wchar_t*>(kName), Main}, {nullptr, nullptr}};
+int RunService(bool consent) {
+    consentMode = consent;
+    if (consent) serviceName = L"WindowsStreamAdminConsent";
+    SERVICE_TABLE_ENTRYW table[]{{const_cast<wchar_t*>(serviceName), Main}, {nullptr, nullptr}};
     return StartServiceCtrlDispatcherW(table) ? 0 : static_cast<int>(GetLastError());
 }
 }
