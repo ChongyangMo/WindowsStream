@@ -2,6 +2,7 @@
 #include "../session.h"
 #include "../../shared/host_control.h"
 #include <shellapi.h>
+#include <shlobj.h>
 
 namespace servermode {
 namespace { bool secureAgent = false; std::wstring attentionEvent; }
@@ -58,7 +59,13 @@ int Dispatch() {
     if (command == L"--consent-agent") return RunConsentAgent();
     if (command == L"--stop-user-host") {
         const auto window = FindWindowW(L"WindowsStreamHostWindow", nullptr);
-        return window && !PostMessageW(window, WM_COMMAND, kHostExitCommand, 0) ? 1 : 0;
+        if (!window) return 0;
+        if (eventName != L"--replace" || !IsUserAnAdmin())
+            return PostMessageW(window, WM_COMMAND, kHostExitCommand, 0) ? 0 : 1;
+        const HostUpdateLock lock(5000);
+        if (!lock) return 1;
+        return SendMessageTimeoutW(window, WM_COMMAND, MAKEWPARAM(kHostExitCommand, kHostReplacementNotification), 0,
+                                   SMTO_ABORTIFHUNG | SMTO_BLOCK, 3000, nullptr) ? 0 : 1;
     }
     return -1;
 }

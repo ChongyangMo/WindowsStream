@@ -21,6 +21,8 @@ public static class WindowsStreamTakeover
 
     public static void RequestExit(uint processId, bool host)
     {
+        const int hostExitCommand = 41002;
+        const int hostReplacementNotification = 1;
         VisitWindow close = (window, context) =>
         {
             uint owner;
@@ -30,7 +32,7 @@ public static class WindowsStreamTakeover
             GetClassName(window, name, name.Capacity);
             var windowClass = name.ToString();
             if (host && windowClass == "WindowsStreamHostWindow")
-                PostMessage(window, 0x0111, new IntPtr(41002), IntPtr.Zero);
+                PostMessage(window, 0x0111, new IntPtr(hostExitCommand | (hostReplacementNotification << 16)), IntPtr.Zero);
             if (!host && (windowClass == "WindowsStreamWorkspace" ||
                           windowClass.StartsWith("WindowsStreamWindow", StringComparison.Ordinal)))
                 PostMessage(window, 0x0010, IntPtr.Zero, IntPtr.Zero);

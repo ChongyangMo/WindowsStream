@@ -52,6 +52,7 @@
     <ClCompile Include="..\host\input_diagnostics.cpp" />
     <ClCompile Include="..\host\locate\locator.cpp" />
     <ClCompile Include="..\host\main.cpp" />
+    <ClCompile Include="..\host\ui\exit_password.cpp" />
     <ClCompile Include="..\host\ui\host_view.cpp" />
     <ClCompile Include="..\host\proxy\packet_relay.cpp" />
     <ClCompile Include="..\host\proxy\proxy_client.cpp" />
@@ -108,6 +109,7 @@
     <ClInclude Include="..\host\gpu_convert.h" />
     <ClInclude Include="..\host\input.h" />
     <ClInclude Include="..\host\input_diagnostics.h" />
+    <ClInclude Include="..\host\ui\exit_password.h" />
     <ClInclude Include="..\host\ui\host_view.h" />
     <ClInclude Include="..\host\locate\locator.h" />
     <ClInclude Include="..\host\proxy\client.h" />

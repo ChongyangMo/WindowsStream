@@ -1,8 +1,21 @@
 #include "resource.h"
 #include "host_version_generated.h"
-#include <winver.h>
+#include <winres.h>
+#pragma code_page(65001)
 
 IDI_WINDOWSSTREAM ICON "host.ico"
+
+IDD_HOST_EXIT_PASSWORD DIALOGEX 0, 0, 172, 83
+STYLE DS_SETFONT | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "退出被控端"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT "退出密码", -1, 9, 9, 154, 10
+    EDITTEXT IDC_HOST_EXIT_PASSWORD, 9, 22, 154, 14, ES_PASSWORD | ES_AUTOHSCROLL
+    LTEXT "密码错误", IDC_HOST_EXIT_ERROR, 9, 40, 154, 10, NOT WS_VISIBLE
+    DEFPUSHBUTTON "退出", IDOK, 59, 59, 50, 14
+    PUSHBUTTON "取消", IDCANCEL, 113, 59, 50, 14
+END
 
 STRINGTABLE
 BEGIN

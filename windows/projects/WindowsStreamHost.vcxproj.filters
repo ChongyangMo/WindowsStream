@@ -7,6 +7,7 @@
     <Filter Include="host\proxy"><UniqueIdentifier>{f62ac80d-defb-4205-b89d-2b36d03c5e0a}</UniqueIdentifier></Filter>
     <Filter Include="host\runtime"><UniqueIdentifier>{ef550d42-9528-4b9a-9dab-2957435fa8e6}</UniqueIdentifier></Filter>
     <Filter Include="host\service"><UniqueIdentifier>{affc18c4-a3d2-4afc-a77e-2771b8c544dc}</UniqueIdentifier></Filter>
+    <Filter Include="host\ui"><UniqueIdentifier>{dcfb9047-cde6-4dc5-93fe-4b6000c9f58e}</UniqueIdentifier></Filter>
     <Filter Include="host\update"><UniqueIdentifier>{eb86f638-34a4-4c43-b812-40e657de8d34}</UniqueIdentifier></Filter>
     <Filter Include="resources"><UniqueIdentifier>{686ab1c0-72af-4dee-ac97-55c21d2de807}</UniqueIdentifier></Filter>
     <Filter Include="shared"><UniqueIdentifier>{894d1e6c-5266-447f-9908-6210ddaa5739}</UniqueIdentifier></Filter>
@@ -34,6 +35,8 @@
     <ClCompile Include="..\host\input.cpp"><Filter>host</Filter></ClCompile>
     <ClCompile Include="..\host\locate\locator.cpp"><Filter>host\locate</Filter></ClCompile>
     <ClCompile Include="..\host\main.cpp"><Filter>host</Filter></ClCompile>
+    <ClCompile Include="..\host\ui\exit_password.cpp"><Filter>host\ui</Filter></ClCompile>
+    <ClCompile Include="..\host\ui\host_view.cpp"><Filter>host\ui</Filter></ClCompile>
     <ClCompile Include="..\host\proxy\packet_relay.cpp"><Filter>host\proxy</Filter></ClCompile>
     <ClCompile Include="..\host\proxy\proxy_client.cpp"><Filter>host\proxy</Filter></ClCompile>
     <ClCompile Include="..\host\runtime\autorun.cpp"><Filter>host\runtime</Filter></ClCompile>
@@ -85,6 +88,8 @@
     <ClInclude Include="..\host\encoder.h"><Filter>host</Filter></ClInclude>
     <ClInclude Include="..\host\gpu_convert.h"><Filter>host</Filter></ClInclude>
     <ClInclude Include="..\host\input.h"><Filter>host</Filter></ClInclude>
+    <ClInclude Include="..\host\ui\exit_password.h"><Filter>host\ui</Filter></ClInclude>
+    <ClInclude Include="..\host\ui\host_view.h"><Filter>host\ui</Filter></ClInclude>
     <ClInclude Include="..\host\locate\locator.h"><Filter>host\locate</Filter></ClInclude>
     <ClInclude Include="..\host\proxy\client.h"><Filter>host\proxy</Filter></ClInclude>
     <ClInclude Include="..\host\proxy\packet_relay.h"><Filter>host\proxy</Filter></ClInclude>

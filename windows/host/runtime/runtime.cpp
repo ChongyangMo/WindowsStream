@@ -44,9 +44,13 @@ void HostRuntime::WatchdogTick() {
 }
 void HostRuntime::Show() { ShowWindow(window_, SW_RESTORE); SetForegroundWindow(window_); }
 void HostRuntime::Status(const std::wstring& status) { status_ = status; tray_.Status(status_); }
+void HostRuntime::RequestExit(const char* reason) {
+    if (!exiting_ && !endingSession_ && exitPassword_.Confirm(window_) && !endingSession_) Exit(reason);
+}
 void HostRuntime::Exit(const char* reason) {
     if (exiting_) return;
     exiting_ = true;
+    exitPassword_.Cancel();
     if (!updateHandoff_) PauseScheduledKeepAlive(PortableDir());
     LogLine("被控端结束：%s，不触发异常恢复", reason);
     Stop();
@@ -73,7 +77,7 @@ bool HostRuntime::Handle(UINT message, WPARAM wParam, LPARAM lParam, LRESULT& re
             break;
         case WM_CLOSE:
             if (tray_.Added()) { ShowWindow(window_, SW_HIDE); LogLine("窗口已隐藏到托盘，被控端继续运行"); }
-            else Exit("关闭窗口");
+            else RequestExit("关闭窗口");
             return true;
         case WM_SIZE:
             if (wParam == SIZE_MINIMIZED && tray_.Added()) { ShowWindow(window_, SW_HIDE); return true; }
@@ -89,8 +93,16 @@ bool HostRuntime::Handle(UINT message, WPARAM wParam, LPARAM lParam, LRESULT& re
         }
         case WM_COMMAND:
             switch (LOWORD(wParam)) {
-                case 1: if (tray_.Added()) ShowWindow(window_, SW_HIDE); else Exit("退出按钮"); return true;
-                case 2: case kHostExitCommand: Exit("用户主动退出"); return true;
+                case 1:
+                    if (tray_.Added()) ShowWindow(window_, SW_HIDE);
+                    else RequestExit("用户主动退出");
+                    return true;
+                case 2: RequestExit("用户主动退出"); return true;
+                case kHostExitCommand:
+                    if (HIWORD(wParam) == kHostReplacementNotification && !HostUpdateLock(0))
+                        Exit("正在替换被控端");
+                    else RequestExit("用户主动退出");
+                    return true;
                 case kTrayShow: Show(); return true;
                 case kTrayAutoStart:
                     if (config_.manageAutoStart) {

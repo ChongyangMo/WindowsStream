@@ -68,7 +68,7 @@ try {
         (Get-Service -Name $name).WaitForStatus('Stopped', [TimeSpan]::FromSeconds(15))
     }
     # 先正常关闭旧用户进程；不同会话的旧实例按原部署路径精确回收。
-    Start-Process -FilePath $source -ArgumentList '--stop-user-host' -WorkingDirectory $PSScriptRoot -WindowStyle Hidden -Wait | Out-Null
+    Start-Process -FilePath $source -ArgumentList '--stop-user-host','--replace' -WorkingDirectory $PSScriptRoot -WindowStyle Hidden -Wait | Out-Null
     Start-Sleep -Seconds 2
     $legacy = Join-Path $PSScriptRoot 'WindowsStreamHost.exe'
     $guardRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '.windowsstream-runtime')) + '\'

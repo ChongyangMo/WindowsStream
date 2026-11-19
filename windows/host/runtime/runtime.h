@@ -5,6 +5,7 @@
 #include "awake.h"
 #include "idle_pulse.h"
 #include "power_watch.h"
+#include "../ui/exit_password.h"
 #include <functional>
 
 class HostRuntime {
@@ -15,6 +16,7 @@ public:
     bool Handle(UINT message, WPARAM wParam, LPARAM lParam, LRESULT& result);
     void Status(const std::wstring& status);
 private:
+    void RequestExit(const char* reason);
     void Exit(const char* reason);
     void Show();
     bool Awake(bool enabled);
@@ -23,6 +25,7 @@ private:
     HWND window_ = nullptr;
     HostConfig config_;
     HostTray tray_;
+    HostExitPassword exitPassword_;
     KeepAlive guard_;
     AwakeLease awake_;
     IdlePulse idle_;
