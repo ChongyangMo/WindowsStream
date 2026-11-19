@@ -1,6 +1,7 @@
 #include "autorun.h"
 #include "../../shared/update_package.h"
 #include <filesystem>
+#include <shlobj.h>
 #include <string_view>
 
 namespace {
@@ -14,10 +15,26 @@ bool RelayLauncherReady(const std::filesystem::path& root) {
 }
 }
 
+bool IsAdminPackageRuntime(const std::filesystem::path& root) {
+    PWSTR folder = nullptr;
+    if (FAILED(SHGetKnownFolderPath(FOLDERID_ProgramFiles, 0, nullptr, &folder))) return false;
+    std::error_code error;
+    const auto base = std::filesystem::canonical(folder, error) / L"WindowsStreamRelayAdmin";
+    CoTaskMemFree(folder);
+    if (error) return false;
+    const auto runtime = std::filesystem::canonical(root, error);
+    if (error || !runtime.filename().wstring().starts_with(L"runtime-")) return false;
+    const auto mode = runtime.parent_path();
+    if (mode.filename() != L"universal" && mode.filename() != L"configured") return false;
+    return _wcsicmp(mode.parent_path().c_str(), base.c_str()) == 0;
+}
+
 bool SetUserAutoStart(bool enabled, bool relay) {
     constexpr auto keyPath = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
     constexpr auto name = L"WindowsStreamHost";
     const auto module = updates::ModulePath();
+    // 管理员版从受保护的目录启动，登录启动交给已授权的计划任务。
+    if (IsAdminPackageRuntime(std::filesystem::path(module).parent_path())) enabled = false;
     const std::wstring argument = relay ? kRelayAutoStartArgument : L"--background";
     const auto command = L"\"" + module + L"\" " + argument;
     if (enabled && (module.empty() || command.size() > MAX_PATH ||
@@ -76,6 +93,7 @@ int LaunchRelayAutoStart() {
     const auto powershell = std::filesystem::path(system) / L"WindowsPowerShell\\v1.0\\powershell.exe";
     auto command = L"\"" + powershell.wstring() + L"\" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"" +
                    (root / kRelayLauncher).wstring() + L"\" -Background";
+    if (IsAdminPackageRuntime(root)) command += L" -AdminRelay";
     STARTUPINFOW startup{sizeof startup};
     PROCESS_INFORMATION child{};
     if (!CreateProcessW(powershell.c_str(), command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW,

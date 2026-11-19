@@ -72,14 +72,17 @@ void AwakeLease::LogPolicy() {
     LogLine("常亮保护只作用于当前会话；手动锁屏、强制安全策略和主动睡眠仍由 Windows 决定");
 }
 
-bool AwakeLease::Enable() {
+bool AwakeLease::Enable(bool disableManualLock) {
     const auto previous = SetThreadExecutionState(requirements);
     if (!previous) { LogLine("启用系统和屏幕常亮失败：%lu", GetLastError()); return false; }
     root_ = PortableDir(); created_ = ProcessCreation(GetCurrentProcess()); enabled_ = true;
     const auto verified = SetThreadExecutionState(requirements);
     LogLine("常亮保护已启用：禁止自动息屏、禁止自动睡眠；系统与显示请求回读 %s",
         (verified & (ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED)) == (ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED) ? "通过" : "未确认");
-    DisableScreenSaver(); SetTemporaryLockPolicy(root_, created_); LogPolicy();
+    DisableScreenSaver();
+    if (disableManualLock) SetTemporaryLockPolicy(root_, created_);
+    else RestoreDormantLockPolicy(root_);
+    LogPolicy();
     return true;
 }
 void AwakeLease::Refresh() {

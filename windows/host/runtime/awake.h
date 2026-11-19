@@ -7,7 +7,7 @@ void RestoreDormantScreenSaver(const std::filesystem::path& root);
 
 class AwakeLease {
 public:
-    bool Enable();
+    bool Enable(bool disableManualLock);
     void Refresh();
     void Release(bool preserveScreenSaver = false);
 private:

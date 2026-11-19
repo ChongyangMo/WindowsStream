@@ -91,6 +91,7 @@ bool LoadHostConfig(HostConfig& config, std::wstring& error) {
     config.tray = GetPrivateProfileIntW(L"background", L"tray", 1, path.c_str()) != 0;
     config.startHidden = GetPrivateProfileIntW(L"background", L"start_hidden", 1, path.c_str()) != 0;
     config.keepAwake = GetPrivateProfileIntW(L"background", L"keep_awake", 1, path.c_str()) != 0;
+    config.disableManualLock = GetPrivateProfileIntW(L"background", L"disable_manual_lock", 1, path.c_str()) != 0;
     config.watchdog = GetPrivateProfileIntW(L"background", L"watchdog", 1, path.c_str()) != 0;
     config.idlePulse = GetPrivateProfileIntW(L"background", L"idle_pulse", 1, path.c_str()) != 0;
     config.idleSeconds = GetPrivateProfileIntW(L"background", L"idle_seconds", 120, path.c_str());

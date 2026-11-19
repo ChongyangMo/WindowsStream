@@ -6,7 +6,7 @@
 bool HostRuntime::Awake(bool enabled) {
     if (enabled) {
         if (!guard_.Start()) { LogLine("启动常亮恢复守护失败，未更改屏保"); return false; }
-        if (!awake_.Enable()) { if (!config_.watchdog) guard_.Stop(); return false; }
+        if (!awake_.Enable(config_.disableManualLock)) { if (!config_.watchdog) guard_.Stop(); return false; }
         SetTimer(window_, 30, 30000, nullptr);
         idle_.Start(window_, config_.idlePulse, config_.idleSeconds);
     } else {
@@ -30,7 +30,7 @@ void HostRuntime::Start(HWND window, const HostConfig& config, bool background, 
     power_.Start(window_);
     const bool hidden = config_.tray && tray_.Add(window_) && background;
     ShowWindow(window_, hidden ? SW_HIDE : show == SW_HIDE ? SW_SHOWNOACTIVATE : show);
-    StartScheduledKeepAlive(PortableDir());
+    StartScheduledKeepAlive(PortableDir(), config_.elevated);
     LogLine("托盘常驻：%s；登录自启 %s，保持唤醒 %s，异常恢复 %s", tray_.Added() ? "已启用" : "未启用",
         config_.manageAutoStart ? (config_.autoStart ? "开" : "关") : "由外部管理",
         config_.keepAwake ? "开" : "关", config_.watchdog ? (guardReady ? "开" : "等待重试") : "关");

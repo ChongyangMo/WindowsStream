@@ -36,7 +36,7 @@ std::wstring XmlText(const std::wstring& text) {
     return escaped;
 }
 
-std::wstring TaskXml(const std::wstring& sid, const std::filesystem::path& program, const std::filesystem::path& root) {
+std::wstring TaskXml(const std::wstring& sid, const std::filesystem::path& program, const std::filesystem::path& root, bool elevated) {
     SYSTEMTIME utc{};
     GetSystemTime(&utc);
     wchar_t start[32]{};
@@ -49,7 +49,7 @@ std::wstring TaskXml(const std::wstring& sid, const std::filesystem::path& progr
 <TimeTrigger><Repetition><Interval>PT1M</Interval></Repetition><StartBoundary>)" + start + LR"(</StartBoundary></TimeTrigger>
 </Triggers>
 <Principals><Principal id="User"><UserId>)" + sid + LR"(</UserId>
-<LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>
+<LogonType>InteractiveToken</LogonType><RunLevel>)" + (elevated ? L"HighestAvailable" : L"LeastPrivilege") + LR"(</RunLevel></Principal></Principals>
 <Settings>
 <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
 <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
@@ -62,8 +62,13 @@ std::wstring TaskXml(const std::wstring& sid, const std::filesystem::path& progr
         LR"(</WorkingDirectory></Exec></Actions></Task>)";
 }
 
-bool Matches(IRegisteredTask* task, const std::filesystem::path& program) {
+bool Matches(IRegisteredTask* task, const std::filesystem::path& program, bool elevated) {
     VARIANT_BOOL enabled = VARIANT_FALSE;
+    TASK_RUNLEVEL_TYPE runLevel{};
+    ComPtr<ITaskDefinition> taskDefinition;
+    ComPtr<IPrincipal> principal;
+    if (FAILED(task->get_Definition(&taskDefinition)) || FAILED(taskDefinition->get_Principal(&principal)) ||
+        FAILED(principal->get_RunLevel(&runLevel)) || runLevel != (elevated ? TASK_RUNLEVEL_HIGHEST : TASK_RUNLEVEL_LUA)) return false;
     BSTR xml = nullptr;
     if (FAILED(task->get_Enabled(&enabled)) || enabled != VARIANT_TRUE || FAILED(task->get_Xml(&xml))) return false;
     const _bstr_t definition(xml, false);
@@ -74,7 +79,7 @@ bool Matches(IRegisteredTask* task, const std::filesystem::path& program) {
 }
 }
 
-HRESULT RegisterKeepAliveTask(const std::filesystem::path& program, const std::filesystem::path& root) {
+HRESULT RegisterKeepAliveTask(const std::filesystem::path& program, const std::filesystem::path& root, bool elevated) {
     struct Apartment {
         HRESULT result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
         ~Apartment() { if (SUCCEEDED(result)) CoUninitialize(); }
@@ -90,11 +95,13 @@ HRESULT RegisterKeepAliveTask(const std::filesystem::path& program, const std::f
     ComPtr<ITaskFolder> folder;
     if (FAILED(result = service->GetFolder(_bstr_t(L"\\"), &folder))) return result;
     ComPtr<IRegisteredTask> task;
-    if (FAILED(folder->GetTask(name, &task)) || !Matches(task.Get(), program)) {
-        const _bstr_t definition(TaskXml(sid, program, root).c_str());
+    if (FAILED(folder->GetTask(name, &task)) || !Matches(task.Get(), program, elevated)) {
+        const _bstr_t definition(TaskXml(sid, program, root, elevated).c_str());
+        const bool upgrading = static_cast<bool>(task);
         result = folder->RegisterTask(name, definition, TASK_CREATE_OR_UPDATE, _variant_t(sid.c_str()), {},
                                       TASK_LOGON_INTERACTIVE_TOKEN, {}, task.ReleaseAndGetAddressOf());
         if (FAILED(result)) return result;
+        if (upgrading) task->Stop(0);
         LogLine("已注册被控端保活计划任务，登录时启动，每分钟补启动一次");
     }
     TASK_STATE state = TASK_STATE_UNKNOWN;

@@ -18,7 +18,7 @@ try {
         Assert-StreamFiles @($hostConfig)
         $relay = Test-Path -LiteralPath $relayConfig
         if ($relay -and (Read-RelaySection $relayConfig 'relay').role -ne 'host') { throw '中转配置必须使用被控端角色。' }
-        if ($relay -and $AdminRelay) {
+        if ($relay -and $AdminRelay -and !$Background) {
             . (Join-Path $PSScriptRoot 'install-admin-consent.ps1')
             Install-AdminConsentRelay $folder
         }

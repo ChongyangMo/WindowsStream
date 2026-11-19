@@ -120,13 +120,14 @@ clipboard=0
 enabled=0
 
 [background]
-autostart=0
+autostart=1
 relay_autostart=1
 tray=1
 start_hidden=0
-keep_awake=0
-watchdog=0
-idle_pulse=0
+keep_awake=1
+disable_manual_lock=0
+watchdog=1
+idle_pulse=1
 
 [proxy]
 enabled=0

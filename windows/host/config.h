@@ -28,6 +28,7 @@ struct HostConfig {
     bool relayAutoStart = false;
     std::wstring autoStartIni;
     bool keepAwake = true, watchdog = true;
+    bool disableManualLock = true;
     bool idlePulse = true;
     unsigned idleSeconds = 120;
 };

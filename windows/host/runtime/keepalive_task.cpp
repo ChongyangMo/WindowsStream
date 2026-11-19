@@ -6,7 +6,7 @@
 #include "../../shared/update_package.h"
 #include <wtsapi32.h>
 
-HRESULT RegisterKeepAliveTask(const std::filesystem::path& program, const std::filesystem::path& root);
+HRESULT RegisterKeepAliveTask(const std::filesystem::path& program, const std::filesystem::path& root, bool elevated);
 
 namespace {
 constexpr DWORD kCheckInterval = 10000;
@@ -68,13 +68,13 @@ bool LaunchHost(const std::filesystem::path& target) {
 }
 }
 
-void StartScheduledKeepAlive(const std::filesystem::path& root) {
+void StartScheduledKeepAlive(const std::filesystem::path& root, bool elevated) {
     const auto program = PrepareKeepAliveProgram();
     if (program.empty() || !SessionState(root).Save(true)) {
         LogLine("无法准备被控端计划保活，请检查运行目录权限和登录会话");
         return;
     }
-    if (const auto error = RegisterKeepAliveTask(program, root); FAILED(error))
+    if (const auto error = RegisterKeepAliveTask(program, root, elevated && IsAdminPackageRuntime(root)); FAILED(error))
         LogLine("启动被控端计划保活失败：0x%08lX", static_cast<unsigned long>(error));
 }
 
