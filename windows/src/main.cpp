@@ -16,6 +16,7 @@
 #include "diagnostics/freeze_trace.h"
 #include "diagnostics/window_fit.h"
 #include "runtime/tray.h"
+#include "runtime/view_cursor.h"
 #include "runtime/network_setup.h"
 #include "runtime/profile.h"
 #include "runtime/workspace.h"
@@ -30,6 +31,7 @@
 #include <memory>
 #include <set>
 #include <thread>
+#include <utility>
 
 namespace {
 
@@ -249,52 +251,6 @@ std::vector<Candidate> ConnectionCandidates() {
 
 // ---------------- 网络线程 ----------------
 
-HCURSOR CreateRemoteCursor(const std::vector<uint8_t>& payload) {
-    if (payload.size() < 8) return nullptr;
-    int w = ReadU16(payload.data()), h = ReadU16(payload.data() + 2);
-    int hotX = ReadU16(payload.data() + 4), hotY = ReadU16(payload.data() + 6);
-    if (w <= 0 || h <= 0 || payload.size() < 8 + static_cast<size_t>(w) * h * 4) return nullptr;
-
-    BITMAPINFO info{};
-    info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    info.bmiHeader.biWidth = w;
-    info.bmiHeader.biHeight = h;  // 自下而上
-    info.bmiHeader.biPlanes = 1;
-    info.bmiHeader.biBitCount = 32;
-    void* bits = nullptr;
-    HDC screen = GetDC(nullptr);
-    HBITMAP color = CreateDIBSection(screen, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
-    ReleaseDC(nullptr, screen);
-    if (!color) return nullptr;
-
-    // Windows 给的是预乘 alpha，图标需要非预乘。
-    const uint8_t* src = payload.data() + 8;
-    auto* dst = static_cast<uint8_t*>(bits);
-    for (int y = 0; y < h; ++y) {
-        const uint8_t* row = src + static_cast<size_t>(y) * w * 4;
-        uint8_t* out = dst + static_cast<size_t>(h - 1 - y) * w * 4;
-        for (int x = 0; x < w; ++x) {
-            uint8_t a = row[x * 4 + 3];
-            for (int c = 0; c < 3; ++c) {
-                out[x * 4 + c] = a ? static_cast<uint8_t>(std::min(255, row[x * 4 + c] * 255 / a)) : 0;
-            }
-            out[x * 4 + 3] = a;
-        }
-    }
-    std::vector<uint8_t> maskBits(static_cast<size_t>((w + 15) / 16 * 2) * h, 0);
-    HBITMAP mask = CreateBitmap(w, h, 1, 1, maskBits.data());
-    ICONINFO icon{};
-    icon.fIcon = FALSE;
-    icon.xHotspot = static_cast<DWORD>(hotX);
-    icon.yHotspot = static_cast<DWORD>(hotY);
-    icon.hbmMask = mask;
-    icon.hbmColor = color;
-    HCURSOR cursor = CreateIconIndirect(&icon);
-    DeleteObject(color);
-    DeleteObject(mask);
-    return cursor;
-}
-
 void HandlePong(const std::vector<uint8_t>& payload) {
     if (payload.size() < 16) return;
     auto& samples = g_clockSamples;  // 每次连接独立估算，避免沿用上一台电脑的时钟。
@@ -443,13 +399,13 @@ void NetworkLoop() {
                     g_video.SubmitLossless(std::move(payload));
                     payload = {};
                     break;
-                case MsgCursor:
-                    if (HCURSOR cursor = CreateRemoteCursor(payload)) {
-                        if (!PostMessageW(g_window, WM_APP_CURSOR, 0, reinterpret_cast<LPARAM>(cursor))) {
-                            DestroyCursor(cursor);
-                        }
-                    }
+                case MsgCursor: {
+                    HCURSOR cursor = DecodeRemoteCursor(payload);
+                    if (!cursor) trace.Event("远程光标不可用，使用系统箭头（消息字节数）", payload.size());
+                    if (!PostMessageW(g_window, WM_APP_CURSOR, 0, reinterpret_cast<LPARAM>(cursor)) && cursor)
+                        DestroyCursor(cursor);
                     break;
+                }
                 case MsgPong:
                     HandlePong(payload);
                     break;
@@ -504,6 +460,7 @@ void NetworkLoop() {
             std::lock_guard lock(g_connectionMutex);
             g_connection.reset();
         }
+        PostMessageW(g_window, WM_APP_CURSOR, 0, 0);
         g_video.clockOffsetValid = false;
         g_diagnostics.End();
         trace.Event("连接断开（退出）", !g_running);
@@ -858,14 +815,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPara
             return 0;
         }
         case WM_APP_CURSOR: {
-            if (g_remoteCursor) DestroyCursor(g_remoteCursor);
-            g_remoteCursor = reinterpret_cast<HCURSOR>(lParam);
-            POINT p;
-            RECT client;
-            GetCursorPos(&p);
-            ScreenToClient(hwnd, &p);
-            GetClientRect(hwnd, &client);
-            if (PtInRect(&client, p) && ViewerHasFocus(hwnd)) SetCursor(g_remoteCursor);
+            const auto previous = std::exchange(g_remoteCursor, reinterpret_cast<HCURSOR>(lParam));
+            POINT p{};
+            RECT client{};
+            if (!g_fileDrag.Dragging() && GetCursorPos(&p) && WindowFromPoint(p) == hwnd &&
+                ScreenToClient(hwnd, &p) && GetClientRect(hwnd, &client) && PtInRect(&client, p))
+                SendMessageW(hwnd, WM_SETCURSOR, reinterpret_cast<WPARAM>(hwnd), MAKELPARAM(HTCLIENT, 0));
+            if (previous) DestroyCursor(previous);
             return 0;
         }
         case WM_APP_STATUS: {
@@ -1100,6 +1056,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show) {
     g_networkAccess.Stop();
     if (auto connection = CurrentConnection()) connection->Shutdown();
     if (g_networkThread.joinable()) g_networkThread.join();
+    if (g_remoteCursor) DestroyCursor(g_remoteCursor);
     g_remoteFiles.Stop();
     g_fileUpload.Stop();
     Connection::CloseReverseListener();

@@ -53,6 +53,7 @@
     <ClCompile Include="..\src\runtime\profile.cpp"><Filter>src\runtime</Filter></ClCompile>
     <ClCompile Include="..\src\runtime\relay.cpp"><Filter>src\runtime</Filter></ClCompile>
     <ClCompile Include="..\src\runtime\tray.cpp"><Filter>src\runtime</Filter></ClCompile>
+    <ClCompile Include="..\src\runtime\view_cursor.cpp"><Filter>src\runtime</Filter></ClCompile>
     <ClCompile Include="..\src\runtime\workspace.cpp"><Filter>src\runtime</Filter></ClCompile>
     <ClCompile Include="..\src\runtime\workspace\catalog.cpp"><Filter>src\runtime\workspace</Filter></ClCompile>
     <ClCompile Include="..\src\runtime\workspace\frame.cpp"><Filter>src\runtime\workspace</Filter></ClCompile>
@@ -102,6 +103,7 @@
     <ClInclude Include="..\src\runtime\network_setup.h"><Filter>src\runtime</Filter></ClInclude>
     <ClInclude Include="..\src\runtime\relay.h"><Filter>src\runtime</Filter></ClInclude>
     <ClInclude Include="..\src\runtime\tray.h"><Filter>src\runtime</Filter></ClInclude>
+    <ClInclude Include="..\src\runtime\view_cursor.h"><Filter>src\runtime</Filter></ClInclude>
     <ClInclude Include="..\src\runtime\workspace.h"><Filter>src\runtime</Filter></ClInclude>
     <ClInclude Include="..\src\runtime\workspace\catalog.h"><Filter>src\runtime\workspace</Filter></ClInclude>
     <ClInclude Include="..\src\runtime\workspace\picker.h"><Filter>src\runtime\workspace</Filter></ClInclude>

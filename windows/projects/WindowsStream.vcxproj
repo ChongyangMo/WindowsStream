@@ -68,6 +68,7 @@
     <ClCompile Include="..\src\runtime\profile.cpp" />
     <ClCompile Include="..\src\runtime\relay.cpp" />
     <ClCompile Include="..\src\runtime\tray.cpp" />
+    <ClCompile Include="..\src\runtime\view_cursor.cpp" />
     <ClCompile Include="..\src\runtime\workspace.cpp" />
     <ClCompile Include="..\src\runtime\workspace\catalog.cpp" />
     <ClCompile Include="..\src\runtime\workspace\frame.cpp" />
@@ -119,6 +120,7 @@
     <ClInclude Include="..\src\runtime\profile.h" />
     <ClInclude Include="..\src\runtime\relay.h" />
     <ClInclude Include="..\src\runtime\tray.h" />
+    <ClInclude Include="..\src\runtime\view_cursor.h" />
     <ClInclude Include="..\src\runtime\workspace.h" />
     <ClInclude Include="..\src\runtime\workspace\catalog.h" />
     <ClInclude Include="..\src\runtime\workspace\picker.h" />
